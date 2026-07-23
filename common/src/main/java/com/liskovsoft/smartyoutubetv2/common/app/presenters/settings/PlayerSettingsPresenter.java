@@ -78,6 +78,8 @@ public class PlayerSettingsPresenter extends BasePresenter<Void> {
         //appendPlayerExitCategory(settingsPresenter);
         appendSleepTimerCategory(settingsPresenter);
         appendMiscCategory(settingsPresenter);
+        appendAutoLikeCategory(settingsPresenter);
+        appendChatFilterCategory(settingsPresenter);
         appendDeveloperCategory(settingsPresenter);
 
         settingsPresenter.showDialog(getContext().getString(R.string.settings_player), mOnFinish);
@@ -487,6 +489,114 @@ public class PlayerSettingsPresenter extends BasePresenter<Void> {
                 mPlayerTweaksData.isQueueRespectsPlaybackMode()));
 
         settingsPresenter.appendCheckedCategory(getContext().getString(R.string.player_other), options);
+    }
+
+    private void appendChatFilterCategory(AppDialogPresenter settingsPresenter) {
+        // Single button that opens sub-dialog with two toggles
+        settingsPresenter.appendSingleButton(UiOptionItem.from(getContext().getString(R.string.player_chat_filter), optionItem -> {
+            AppDialogPresenter presenter = AppDialogPresenter.instance(getContext());
+
+            List<OptionItem> options = new ArrayList<>();
+
+            options.add(UiOptionItem.from(getContext().getString(R.string.player_chat_filter_hide_bots),
+                    option -> mPlayerTweaksData.setHideBotUsersEnabled(option.isSelected()),
+                    mPlayerTweaksData.isHideBotUsersEnabled()));
+
+            options.add(UiOptionItem.from(getContext().getString(R.string.player_chat_filter_hide_commands),
+                    option -> mPlayerTweaksData.setHideExclamCommandsEnabled(option.isSelected()),
+                    mPlayerTweaksData.isHideExclamCommandsEnabled()));
+
+            presenter.appendCheckedCategory(getContext().getString(R.string.player_chat_filter), options);
+            presenter.showDialog(getContext().getString(R.string.player_chat_filter));
+        }));
+    }
+
+    private void appendAutoLikeCategory(AppDialogPresenter settingsPresenter) {
+        // Single button that opens sub-dialog
+        settingsPresenter.appendSingleButton(UiOptionItem.from(getContext().getString(R.string.player_autolike), optionItem -> {
+            AppDialogPresenter presenter = AppDialogPresenter.instance(getContext());
+
+            // Enable checkbox
+            boolean enabled = mPlayerTweaksData.isAutoLikeEnabled();
+            presenter.appendSingleSwitch(UiOptionItem.from(getContext().getString(R.string.player_autolike_enabled),
+                    option -> mPlayerTweaksData.setAutoLikeEnabled(option.isSelected()), enabled));
+
+            // Trigger: both seconds AND percent in one combined list
+            List<OptionItem> triggerOptions = new ArrayList<>();
+            int mode = mPlayerTweaksData.getAutoLikeMode();
+            int value = mPlayerTweaksData.getAutoLikeValue();
+
+            // Seconds branch
+            int[] secondsValues = {30, 60, 120, 300, 600};
+            for (int s : secondsValues) {
+                int secs = s;
+                triggerOptions.add(UiOptionItem.from(
+                        getContext().getString(R.string.player_autolike_value_seconds, String.valueOf(secs)),
+                        option -> {
+                            mPlayerTweaksData.setAutoLikeEnabled(true);
+                            mPlayerTweaksData.setAutoLikeMode(PlayerTweaksData.AUTOLIKE_MODE_SECONDS);
+                            mPlayerTweaksData.setAutoLikeValue(secs);
+                        },
+                        value == secs && mode == PlayerTweaksData.AUTOLIKE_MODE_SECONDS));
+            }
+
+            // Percent branch
+            int[] percentValues = {10, 25, 50, 75, 90};
+            for (int p : percentValues) {
+                int pct = p;
+                triggerOptions.add(UiOptionItem.from(
+                        getContext().getString(R.string.player_autolike_value_percent, String.valueOf(pct)),
+                        option -> {
+                            mPlayerTweaksData.setAutoLikeEnabled(true);
+                            mPlayerTweaksData.setAutoLikeMode(PlayerTweaksData.AUTOLIKE_MODE_PERCENT);
+                            mPlayerTweaksData.setAutoLikeValue(pct);
+                        },
+                        value == pct && mode == PlayerTweaksData.AUTOLIKE_MODE_PERCENT));
+            }
+
+            presenter.appendRadioCategory(getContext().getString(R.string.player_autolike_mode), triggerOptions);
+
+            // Min duration
+            List<OptionItem> minDurOptions = new ArrayList<>();
+            int[] minDurValues = {0, 1, 3, 5, 10, 15};
+            int currentMinDur = mPlayerTweaksData.getAutoLikeMinDurationSec();
+            for (int d : minDurValues) {
+                int durSec = d * 60;
+                minDurOptions.add(UiOptionItem.from(
+                        getContext().getString(R.string.player_autolike_min_duration_val, String.valueOf(d)),
+                        option -> mPlayerTweaksData.setAutoLikeMinDurationSec(durSec),
+                        currentMinDur == durSec));
+            }
+            presenter.appendRadioCategory(getContext().getString(R.string.player_autolike_min_duration), minDurOptions);
+
+            // Overlay duration
+            List<OptionItem> overlayDurOptions = new ArrayList<>();
+            int[] overlayDurValues = {0, 1, 2, 3, 5, 10};
+            int currentOverlayDur = mPlayerTweaksData.getAutoLikeOverlayDurationSec();
+            for (int d : overlayDurValues) {
+                int dur = d;
+                overlayDurOptions.add(UiOptionItem.from(
+                        getContext().getString(R.string.player_autolike_overlay_duration_val, String.valueOf(dur)),
+                        option -> mPlayerTweaksData.setAutoLikeOverlayDurationSec(dur),
+                        currentOverlayDur == dur));
+            }
+            presenter.appendRadioCategory(getContext().getString(R.string.player_autolike_overlay_duration), overlayDurOptions);
+
+            // Overlay dimming
+            List<OptionItem> overlayDimOptions = new ArrayList<>();
+            int[] overlayDimValues = {0, 10, 20, 40, 60, 80};
+            int currentOverlayDim = mPlayerTweaksData.getAutoLikeOverlayDimmingPercent();
+            for (int dim : overlayDimValues) {
+                int d = dim;
+                overlayDimOptions.add(UiOptionItem.from(
+                        getContext().getString(R.string.player_autolike_overlay_dimming_val, String.valueOf(d)),
+                        option -> mPlayerTweaksData.setAutoLikeOverlayDimmingPercent(d),
+                        currentOverlayDim == d));
+            }
+            presenter.appendRadioCategory(getContext().getString(R.string.player_autolike_overlay_dimming), overlayDimOptions);
+
+            presenter.showDialog(getContext().getString(R.string.player_autolike));
+        }));
     }
 
     private void appendDeveloperCategory(AppDialogPresenter settingsPresenter) {

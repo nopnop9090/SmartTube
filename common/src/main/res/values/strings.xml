@@ -292,6 +292,9 @@
     <string name="removed_from_history">Video has been removed from history</string>
     <string name="remove_from_history">Remove from history</string>
     <string name="upload_date">Upload date</string>
+    <string name="player_chat_filter">Chat filter</string>
+    <string name="player_chat_filter_hide_bots">Hide bot accounts (Streamlabs, Nightbot, etc.)</string>
+    <string name="player_chat_filter_hide_commands">Hide messages starting with !</string>
     <string name="upload_date_any">All time</string>
     <string name="upload_date_today">Today</string>
     <string name="upload_date_this_week">This week</string>
