@@ -67,30 +67,31 @@ The local repo has two remotes:
 
 ---
 
-### 2. Age Cutoff
+### 2. Age Cutoff (Upload-Date Filter)
 
-**What it does:** Hides age-restricted videos from feeds (subscriptions, channel uploads, search results). Videos that YouTube has tagged with age-18 restrictions disappear from view automatically.
+**What it does:** Hides videos from feeds (subscriptions, channel uploads, search results) based on how long ago they were uploaded. Configure a maximum video age (e.g. "1 month") and only videos published within that window are shown.
 
-**Why:** Age-restricted videos are often irrelevant or unwanted content (gore, mature themes, restricted-by-creator content). When you scroll a long feed, you don't want them mixed in with normal videos.
+**Why:** When you watch a subscription feed of an active channel, older videos clutter the list. With cutoff set to e.g. 1 month, you only see recent uploads — no more "2-year-old video suggested" while you're trying to find the latest one.
 
 **How it works:**
-- Compares `published_at` (upload time) against a cutoff date
-- Age-restricted videos published **before** the cutoff are shown (they're old enough that the restriction may not apply anymore in your jurisdiction)
-- Age-restricted videos published **after** the cutoff are hidden
+- Every `Video` has a `publishedAt` timestamp (upload time)
+- Filter compares `publishedAt` against a cutoff = `now - duration` (e.g. `now - 1 month`)
+- Videos with `publishedAt >= cutoff` are shown; older videos are filtered out
 
-**Configurable cutoff:**
-- `RelativePublishedTime.java` parses relative time strings ("2 days ago", "3 weeks ago", "1 month ago") into actual timestamps
-- Cutoff is stored as a duration, not an absolute date (so it stays current across sessions)
-- Settings UI in General Settings (not Player settings) — age restriction applies across all feeds
+**Configurable duration:**
+- `RelativePublishedTime.java` parses YouTube's relative time strings ("2 days ago", "3 weeks ago", "1 month ago") into actual timestamps — needed because YouTube returns relative strings in some feeds
+- Cutoff is stored as a duration string ("1 week", "1 month", etc.) — `AgeCutoffData.java` resolves it against `now` on every read
+- Settings UI in General Settings (not Player settings) — applies across all feeds
 
 **Where in settings:** Main settings → General → Age cutoff → choose duration (1 week / 1 month / 3 months / 6 months / 1 year).
 
-**Implementation:** `VideoGroup.java` and `Video.java` filter age-restricted videos before they're added to a `VideoGroup`. `AgeCutoffData.java` stores the cutoff duration; `RelativePublishedTime.java` parses YouTube's relative time strings.
+**Implementation:** `VideoGroup.java` and `Video.java` filter videos by `publishedAt` before they're added to a `VideoGroup`. `AgeCutoffData.java` stores the cutoff duration; `RelativePublishedTime.java` parses YouTube's relative time strings into absolute timestamps for the comparison.
 
 **What it does NOT do:**
-- Does not delete or block the videos — you can still find them via direct URL or search
-- Does not hide age-restricted videos from the channel page of the uploader themselves
+- Does not delete or block the videos — you can still find them via direct URL, channel page, or search
 - Does not affect watch history, only the browsing feeds
+- Does not consider age-restriction or content-rating flags — purely time-based
+- Does not apply retroactively to videos already in your watch-later / playlists
 
 ---
 
@@ -132,7 +133,7 @@ The list is hardcoded — no user-customizable bot list. Adding more bots means 
 
 The author uses SmartTube on a Nvidia Shield for:
 - Watching full channels' archives → wants AutoLike to track what was actually watched
-- Following a few long-running channels → wants age-restricted videos (which YouTube increasingly tags aggressively) out of the feed
+- Following a few long-running channels → wants old uploads filtered out of the feed (e.g. cutoff at 1 month, so 2-year-old videos don't appear)
 - Watching livestreams → wants chat filtered because chat is unreadable otherwise
 
 The features are **personal-utility additions**, not contributions back to upstream. They're kept simple, toggleable, and with sensible defaults so they don't surprise users who don't want them.
