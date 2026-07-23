@@ -9,6 +9,7 @@ import com.liskovsoft.sharedutils.helpers.Helpers;
 import com.liskovsoft.sharedutils.helpers.MessageHelpers;
 import com.liskovsoft.sharedutils.mylogger.Log;
 import com.liskovsoft.sharedutils.okhttp.OkHttpManager;
+import com.liskovsoft.smartyoutubetv2.common.BuildConfig;
 import com.liskovsoft.smartyoutubetv2.common.R;
 import com.liskovsoft.smartyoutubetv2.common.app.models.playback.ui.OptionItem;
 import com.liskovsoft.smartyoutubetv2.common.app.models.playback.ui.UiOptionItem;
@@ -99,15 +100,17 @@ public class DualAppUpdatePresenter extends BasePresenter<Void> {
     private void runForkCheck() {
         try {
             List<ForkRelease> releases = fetchForkReleases();
-            int currentVersionCode = getCurrentVersionCode();
+            int[] installedComps = getInstalledVersionComponents();
             List<ForkRelease> newerReleases = new ArrayList<>();
             for (ForkRelease rel : releases) {
-                if (rel.versionCode > currentVersionCode) {
+                int status = classifyStatus(rel.tagComponents, installedComps);
+                rel.status = status;
+                if (status == STATUS_NEWER) {
                     newerReleases.add(rel);
                 }
             }
             // Run UI dispatch on main thread
-            Helpers.postOnUiThread(() -> handleForkResults(newerReleases, releases, currentVersionCode));
+            Helpers.postOnUiThread(() -> handleForkResults(newerReleases, releases, installedComps));
         } catch (Exception ex) {
             Log.e(TAG, "Fork update check failed: " + ex.getMessage(), ex);
             Helpers.postOnUiThread(() -> {
@@ -119,42 +122,42 @@ public class DualAppUpdatePresenter extends BasePresenter<Void> {
         }
     }
 
-    private void handleForkResults(List<ForkRelease> newerReleases, List<ForkRelease> allReleases, int currentVersionCode) {
+    private void handleForkResults(List<ForkRelease> newerReleases, List<ForkRelease> allReleases, int[] installedComps) {
         // Note: mIsForceCheck + LoadingManager handling is owned by the UI dialog flow;
         // we don't dismiss LoadingManager here because the origin check may still be in flight.
         if (newerReleases.isEmpty()) {
             if (mIsForceCheck) {
-                showNoForkUpdateFound(allReleases, currentVersionCode);
+                showNoForkUpdateFound(allReleases, installedComps);
             }
             return;
         }
-        showForkUpdateDialog(newerReleases, currentVersionCode);
+        showForkUpdateDialog(newerReleases, installedComps);
     }
 
-    private void showNoForkUpdateFound(List<ForkRelease> allReleases, int currentVersionCode) {
+    private void showNoForkUpdateFound(List<ForkRelease> allReleases, int[] installedComps) {
         // User-triggered check: show "everything up to date" + offer to inspect the 3 latest (in case
         // they want to downgrade). Dismiss loading first.
         LoadingManager.showLoading(getContext(), false);
         List<OptionItem> options = new ArrayList<>();
         // Even if "up to date", still offer the 3 latest as a manual archive (for reinstall / downgrade)
         for (ForkRelease rel : allReleases) {
-            options.add(buildForkInstallOption(rel, currentVersionCode));
+            options.add(buildForkInstallOption(rel, installedComps));
         }
         mDialog.appendStringsCategory(getContext().getString(R.string.dual_update_no_updates_available), options);
         mDialog.showDialog(getContext().getString(R.string.dual_update_dialog_title), DualAppUpdatePresenter::unhold);
     }
 
-    private void showForkUpdateDialog(List<ForkRelease> newerReleases, int currentVersionCode) {
+    private void showForkUpdateDialog(List<ForkRelease> newerReleases, int[] installedComps) {
         LoadingManager.showLoading(getContext(), false);
         if (getContext() == null || getViewManager().isPlayerInForeground() || !Utils.isAppInForegroundFixed()) {
             // Defer if player is open / app backgrounded
-            pinForkUpdateSection(newerReleases);
+            pinForkUpdateSection(newerReleases, installedComps);
             return;
         }
         List<OptionItem> options = new ArrayList<>();
-        // Order: newest first (releases list is sorted desc). Marker handled per-version via classifyStatus().
+        // Order: newest first (releases list is sorted desc). Status is pre-computed in runForkCheck.
         for (ForkRelease rel : newerReleases) {
-            options.add(buildForkInstallOption(rel, currentVersionCode));
+            options.add(buildForkInstallOption(rel, installedComps));
         }
         mDialog.appendStringsCategory(
                 getContext().getString(R.string.dual_update_fork_releases_category),
@@ -164,13 +167,12 @@ public class DualAppUpdatePresenter extends BasePresenter<Void> {
         mDialog.showDialog(getContext().getString(R.string.dual_update_dialog_title), DualAppUpdatePresenter::unhold);
     }
 
-    private void pinForkUpdateSection(List<ForkRelease> newerReleases) {
+    private void pinForkUpdateSection(List<ForkRelease> newerReleases, int[] installedComps) {
         if (getContext() == null) return;
-        int currentVersionCode = getCurrentVersionCode();
         StringBuilder body = new StringBuilder();
         for (ForkRelease rel : newerReleases) {
-            String marker = markerFor(classifyStatus(rel.versionCode, currentVersionCode));
-            body.append(String.format("%s  %s (v%d)%n", marker, rel.tag, rel.versionCode));
+            String marker = markerFor(rel.status);
+            body.append(String.format("%s  %s%n", marker, rel.tag));
         }
         body.append("\n").append(getContext().getString(R.string.dual_update_open_settings_hint));
 
@@ -180,7 +182,7 @@ public class DualAppUpdatePresenter extends BasePresenter<Void> {
                 new com.liskovsoft.smartyoutubetv2.common.app.models.errors.ErrorFragmentData() {
                     @Override
                     public void onAction() {
-                        Helpers.postOnUiThread(() -> showForkUpdateDialog(newerReleases, getCurrentVersionCode()));
+                        Helpers.postOnUiThread(() -> showForkUpdateDialog(newerReleases, getInstalledVersionComponents()));
                     }
                     @Override
                     public String getMessage() {
@@ -201,14 +203,13 @@ public class DualAppUpdatePresenter extends BasePresenter<Void> {
      *   ● CURRENT   (rel.versionCode == currentVersionCode)
      *   ▼ OLDER     (rel.versionCode &lt; currentVersionCode, with downgrade confirmation)
      */
-    private OptionItem buildForkInstallOption(ForkRelease rel, int currentVersionCode) {
-        int status = classifyStatus(rel.versionCode, currentVersionCode);
+    private OptionItem buildForkInstallOption(ForkRelease rel, int[] installedComps) {
+        int status = rel.status;
         String marker = markerFor(status);
-        String label = String.format("%s  %s  %s (v%d) • %s",
+        String label = String.format("%s  %s  %s • %s",
                 marker,
                 getContext().getString(R.string.dual_update_install_label),
                 rel.tag,
-                rel.versionCode,
                 rel.humanSize());
         return UiOptionItem.from(label, optionItem -> onInstallClicked(rel, status));
     }
@@ -237,14 +238,28 @@ public class DualAppUpdatePresenter extends BasePresenter<Void> {
     }
 
     /**
-     * Classify a release relative to the currently installed version.
-     * Note: synthetic versionCode is compared numerically, so e.g. v32.07-features-2 == 320009
-     * will compare as newer than v32.07-features-1 (320008).
+     * Classify a release relative to the currently installed version using version-component arrays.
+     *   release  = [major, minor, patch, featuresN]
+     *   installed = [major, minor, patch, 0]   (we never know featuresN of installed APK)
+     * Logic:
+     *   - Different major.minor.patch: compare those directly (independent of featuresN)
+     *   - Same major.minor.patch: NEWER iff release.featuresN > 0 (any fork release newer than
+     *     a non-fork install), OLDER iff release.featuresN < installed.featuresN (can't happen
+     *     because installed.featuresN=0), CURRENT impossible because we don't know featuresN.
+     *   - When installed components can't be read: all releases show as CURRENT (we can't tell).
      */
-    private int classifyStatus(int releaseVersionCode, int currentVersionCode) {
-        if (releaseVersionCode > currentVersionCode) return STATUS_NEWER;
-        if (releaseVersionCode == currentVersionCode) return STATUS_CURRENT;
-        return STATUS_OLDER;
+    private int classifyStatus(int[] release, int[] installed) {
+        if (installed == null || release == null) return STATUS_CURRENT;
+        int cmp = compareVersionComponents(
+                new int[]{release[0], release[1], release[2], 0},
+                new int[]{installed[0], installed[1], installed[2], 0});
+        if (cmp != 0) {
+            return cmp > 0 ? STATUS_NEWER : STATUS_OLDER;
+        }
+        // Same major.minor.patch — compare featuresN
+        if (release[3] > installed[3]) return STATUS_NEWER;
+        if (release[3] < installed[3]) return STATUS_OLDER;
+        return STATUS_CURRENT;
     }
 
     private String markerFor(int status) {
@@ -370,19 +385,27 @@ public class DualAppUpdatePresenter extends BasePresenter<Void> {
             boolean draft = rel.optBoolean("draft", false);
             boolean prerelease = rel.optBoolean("prerelease", false);
             if (draft || prerelease) continue;
-            int versionCode = parseVersionCodeFromTag(tag);
+            int[] tagComps = parseTagComponents(tag);
             String apkUrl = findApkAssetUrl(rel.optJSONArray("assets"));
             if (apkUrl == null) continue;
             ForkRelease fr = new ForkRelease();
             fr.tag = tag;
-            fr.versionCode = versionCode;
+            fr.tagComponents = tagComps;
             fr.apkUrl = apkUrl;
             fr.sizeBytes = relSizeFromAssets(rel.optJSONArray("assets"));
             fr.shortChangelog = shortenChangelog(rel.optString("body", ""));
             result.add(fr);
         }
-        // Sort by versionCode desc
-        Collections.sort(result, (a, b) -> Integer.compare(b.versionCode, a.versionCode));
+        // Sort by tag components desc (major.minor.patch.featuresN lexicographic)
+        Collections.sort(result, (a, b) -> {
+            if (a.tagComponents == null) return 1;
+            if (b.tagComponents == null) return -1;
+            for (int i = 0; i < 4; i++) {
+                int cmp = Integer.compare(b.tagComponents[i], a.tagComponents[i]);
+                if (cmp != 0) return cmp;
+            }
+            return 0;
+        });
         // Cap to FORK_RELEASE_LIMIT
         if (result.size() > FORK_RELEASE_LIMIT) {
             result = result.subList(0, FORK_RELEASE_LIMIT);
@@ -390,23 +413,24 @@ public class DualAppUpdatePresenter extends BasePresenter<Void> {
         return result;
     }
 
-    private int parseVersionCodeFromTag(String tag) {
-        // tag is "v<version>-features-<N>" — we don't know the upstream versionCode, so we
-        // synthesize one from the trailing feature number: 10000 * major(ver) + 100 * minor(ver) + patch(ver) + feat
-        // Example: v32.07-features-1 → 32*10000 + 0*100 + 7 + 1 = 320008
+    /**
+     * Parse the version components from a tag like 'v32.07-features-1'.
+     * Returns null on parse error. Returned array has 4 ints:
+     *   [major, minor, patch, featuresN]  (patch=0 if absent)
+     * Used to compute status relative to the installed version.
+     */
+    private int[] parseTagComponents(String tag) {
         try {
             String stripped = tag.startsWith("v") ? tag.substring(1) : tag;
-            // Format: <version>-features-<N>  e.g. "32.07-features-1"
             String[] parts = stripped.split("-");
-            // parts[0]=version, parts[1]="features", parts[2]=N (or parts[3]=N if version has dashes, which it doesn't here)
             String[] ver = parts[0].split("\\.");
             int major = ver.length > 0 ? Integer.parseInt(ver[0]) : 0;
             int minor = ver.length > 1 ? Integer.parseInt(ver[1]) : 0;
             int patch = ver.length > 2 ? Integer.parseInt(ver[2]) : 0;
             int feat = parts.length > 2 ? Integer.parseInt(parts[2]) : 0;
-            return major * 10000 + minor * 100 + patch + feat;
+            return new int[] {major, minor, patch, feat};
         } catch (Exception ex) {
-            return 0;
+            return null;
         }
     }
 
@@ -443,15 +467,47 @@ public class DualAppUpdatePresenter extends BasePresenter<Void> {
         return firstLine.length() > 80 ? firstLine.substring(0, 77) + "..." : firstLine;
     }
 
-    private int getCurrentVersionCode() {
+    /**
+     * Read installed version components. Source priority:
+     *   1. BuildConfig.FORK_VERSION (e.g. "v32.07-features-3") — set per-release in build.gradle
+     *   2. PackageManager.versionName (e.g. "32.07") — fallback when FORK_VERSION is empty
+     * Returns int[] {major, minor, patch, featuresN} or null if reading fails.
+     */
+    private int[] getInstalledVersionComponents() {
+        // 1. Try BuildConfig.FORK_VERSION first (set per release via build.gradle)
+        String forkTag = BuildConfig.FORK_VERSION;
+        if (forkTag != null && !forkTag.isEmpty()) {
+            int[] comps = parseTagComponents(forkTag);
+            if (comps != null) return comps;
+        }
+        // 2. Fallback to PackageManager.versionName (no featuresN info → featuresN = 0)
         try {
             PackageInfo info = getContext().getPackageManager()
                     .getPackageInfo(getContext().getPackageName(), 0);
-            return info.versionCode;
+            if (info.versionName == null) return null;
+            String[] ver = info.versionName.split("\\.");
+            int major = ver.length > 0 ? Integer.parseInt(ver[0]) : 0;
+            int minor = ver.length > 1 ? Integer.parseInt(ver[1]) : 0;
+            int patch = ver.length > 2 ? Integer.parseInt(ver[2]) : 0;
+            return new int[] {major, minor, patch, 0};
         } catch (Exception ex) {
-            Log.e(TAG, "Cannot read current versionCode: " + ex.getMessage());
-            return 0;
+            Log.e(TAG, "Cannot read current versionName: " + ex.getMessage());
+            return null;
         }
+    }
+
+    /**
+     * Compare two version-component arrays lexicographically.
+     * Returns negative if a &lt; b, 0 if equal, positive if a &gt; b.
+     * Compare order: major, minor, patch, featuresN.
+     */
+    private int compareVersionComponents(int[] a, int[] b) {
+        if (a == null || b == null) return 0;
+        for (int i = 0; i < 4; i++) {
+            int cmp = Integer.compare(a[i], b[i]);
+            if (cmp != 0) return cmp;
+        }
+        return 0;
     }
 
     /**
@@ -459,10 +515,11 @@ public class DualAppUpdatePresenter extends BasePresenter<Void> {
      */
     private static class ForkRelease {
         String tag;
-        int versionCode;
+        int[] tagComponents;  // [major, minor, patch, featuresN]
         String apkUrl;
         long sizeBytes;
         String shortChangelog;
+        int status = STATUS_CURRENT;  // pre-computed in runForkCheck via classifyStatus()
 
         String humanSize() {
             if (sizeBytes <= 0) return "?";

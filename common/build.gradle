@@ -3,6 +3,9 @@ apply plugin: 'kotlin-android'
 apply plugin: 'com.android.library'
 
 android {
+    buildFeatures {
+        buildConfig true
+    }
     // FIX: Default interface methods are only supported starting with Android N (--min-api 24)
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_1_8
@@ -18,6 +21,11 @@ android {
         targetSdkVersion project.properties.targetSdkVersion
         versionCode 10
         versionName "1.0"
+
+        // Fork-specific version tag (set per release). Read by DualAppUpdatePresenter
+        // to determine status of fork releases relative to installed APK.
+        // Default empty = upstream-style install.
+        buildConfigField "String", "FORK_VERSION", "\"v32.07-features-4\""
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         consumerProguardFiles 'consumer-rules.pro'
