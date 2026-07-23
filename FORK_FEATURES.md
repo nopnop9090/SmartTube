@@ -43,27 +43,30 @@ The local repo has two remotes:
 
 ### 1. Auto-Like
 
-**What it does:** Automatically likes videos after a configurable trigger condition. Helps avoid the manual effort of liking every video in a subscription feed.
+**What it does:** Automatically likes a video once you've watched enough of it (default: 75%). It's a quality signal to YouTube's recommendation engine — if you watched 3/4 of a video, you probably liked it, so the like is registered on your behalf.
 
-**Why:** If you watch a streamer's entire channel regularly, you'd otherwise have to manually like every video — or just never like them. AutoLike ensures your "Liked videos" playlist actually reflects what you watch.
+**Why:** YouTube uses your "Liked videos" as a strong signal for recommendations ("more videos like this"). Manually clicking Like on every video you actually enjoyed is friction, so you end up either liking nothing (weaker recommendations) or liking nothing because you forgot. AutoLike closes that gap: anything you watch past the trigger threshold gets the like.
 
 **Configurable trigger (two modes, choose one):**
 - **After N seconds of playback** (default: 60s) — simple time-based
 - **After N% of video watched** (default: 50%) — percentage-based, works for any video length
 
+The percentage mode is more robust: a 30-second clip at 75% is a different signal than a 90-minute documentary at 75%. Use seconds for predictable short-form, percentage for variable-length content.
+
 **Additional settings:**
-- **Minimum video length** (default: 180s = 3 minutes) — skip shorts and previews
-- **Overlay duration** (default: 5s) — how long the "Auto-liked" overlay shows
+- **Minimum video length** (default: 180s = 3 minutes) — skip shorts and previews so they don't pollute the "Liked videos" list
+- **Overlay duration** (default: 5s) — how long the "Auto-liked" overlay shows after the like fires
 - **Overlay dimming** (default: 40%) — dimming level of the video behind the overlay
 
 **Where in settings:** Long-press a playing video → Player settings → Auto-like → opens sub-dialog with all controls.
 
-**Implementation:** `MediaServiceManager.java` registers a periodic check that calls `like()` on the current video. `PlayerTweaksData.java` persists all settings (indices 61-66 of the merge list).
+**Implementation:** `MediaServiceManager.java` registers a periodic check that calls `like()` on the current video when the trigger threshold is crossed. `PlayerTweaksData.java` persists all settings (indices 61-66 of the merge list).
 
 **What it explicitly does NOT do:**
-- Does not unlike videos you previously liked
+- Does not unlike videos you previously liked (one-way operation)
 - Does not auto-like livestreams (those have a different like flow)
-- Does not bypass the rate limiter (YouTube limits like-actions per minute)
+- Does not bypass YouTube's rate limiter (YouTube limits like-actions per minute; AutoLike respects that)
+- Does not auto-like videos you skipped or skipped back in (only forward-progress counts)
 
 ---
 
@@ -132,7 +135,7 @@ The list is hardcoded — no user-customizable bot list. Adding more bots means 
 ## Why These Specific Three?
 
 The author uses SmartTube on a Nvidia Shield for:
-- Watching full channels' archives → wants AutoLike to track what was actually watched
+- Watching full channels' archives → wants AutoLike to register likes on videos watched past the trigger threshold (quality signal for YouTube's recommendation engine)
 - Following a few long-running channels → wants old uploads filtered out of the feed (e.g. cutoff at 1 month, so 2-year-old videos don't appear)
 - Watching livestreams → wants chat filtered because chat is unreadable otherwise
 
