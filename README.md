@@ -1,6 +1,15 @@
 [<img src="images/badge_fdroid.png" alt="Get it on F-Droid" height="80">](https://f-droid.org/packages/app.smarttube.fdroid/)
 [<img src="images/badge_github.png" alt="Get it on GitHub" height="80">](https://github.com/yuliskov/SmartTube/releases)
 
+> ⚠️ **You are looking at a personal fork of [yuliskov/SmartTube](https://github.com/yuliskov/SmartTube).**
+>
+> This fork adds three personal-utility features (Auto-Like, Age Cutoff, LiveChat Filter) that are **not in upstream**.
+> The original SmartTube is maintained by yuliskov — please support their work, not this fork.
+>
+> **For documentation of the three extra features, see [FORK_FEATURES.md](./FORK_FEATURES.md).**
+> For the official SmartTube releases, see https://github.com/yuliskov/SmartTube/releases.
+> For this fork's releases, see https://github.com/nopnop9090/SmartTube/releases.
+
 # Important announcement about the app
 
 My development environment was infected by unknown malicious software, as a result of which a few builds may have been affected. Once the issue was detected, I secured everything with a full disk wipe, restored a clean setup, and now all builds are scanned with VirusTotal. The F-Droid version will also be verified before release.
