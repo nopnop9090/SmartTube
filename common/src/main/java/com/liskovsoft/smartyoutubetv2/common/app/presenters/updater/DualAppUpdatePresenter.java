@@ -52,6 +52,9 @@ public class DualAppUpdatePresenter extends BasePresenter<Void> {
             "https://api.github.com/repos/nopnop9090/SmartTube/releases?per_page=20";
     private static final String FORK_APK_NAME_HINT = "SmartTube_32_nopnop_features.apk";
     private static final int FORK_RELEASE_LIMIT = 3;
+    private static final int STATUS_NEWER = 0;
+    private static final int STATUS_CURRENT = 1;
+    private static final int STATUS_OLDER = 2;
 
     @SuppressLint("StaticFieldLeak")
     private static DualAppUpdatePresenter sInstance;
@@ -104,7 +107,7 @@ public class DualAppUpdatePresenter extends BasePresenter<Void> {
                 }
             }
             // Run UI dispatch on main thread
-            Helpers.postOnUiThread(() -> handleForkResults(newerReleases, releases));
+            Helpers.postOnUiThread(() -> handleForkResults(newerReleases, releases, currentVersionCode));
         } catch (Exception ex) {
             Log.e(TAG, "Fork update check failed: " + ex.getMessage(), ex);
             Helpers.postOnUiThread(() -> {
@@ -116,32 +119,32 @@ public class DualAppUpdatePresenter extends BasePresenter<Void> {
         }
     }
 
-    private void handleForkResults(List<ForkRelease> newerReleases, List<ForkRelease> allReleases) {
+    private void handleForkResults(List<ForkRelease> newerReleases, List<ForkRelease> allReleases, int currentVersionCode) {
         // Note: mIsForceCheck + LoadingManager handling is owned by the UI dialog flow;
         // we don't dismiss LoadingManager here because the origin check may still be in flight.
         if (newerReleases.isEmpty()) {
             if (mIsForceCheck) {
-                showNoForkUpdateFound(allReleases);
+                showNoForkUpdateFound(allReleases, currentVersionCode);
             }
             return;
         }
-        showForkUpdateDialog(newerReleases);
+        showForkUpdateDialog(newerReleases, currentVersionCode);
     }
 
-    private void showNoForkUpdateFound(List<ForkRelease> allReleases) {
+    private void showNoForkUpdateFound(List<ForkRelease> allReleases, int currentVersionCode) {
         // User-triggered check: show "everything up to date" + offer to inspect the 3 latest (in case
         // they want to downgrade). Dismiss loading first.
         LoadingManager.showLoading(getContext(), false);
         List<OptionItem> options = new ArrayList<>();
         // Even if "up to date", still offer the 3 latest as a manual archive (for reinstall / downgrade)
         for (ForkRelease rel : allReleases) {
-            options.add(buildForkInstallOption(rel, false));
+            options.add(buildForkInstallOption(rel, currentVersionCode));
         }
         mDialog.appendStringsCategory(getContext().getString(R.string.dual_update_no_updates_available), options);
         mDialog.showDialog(getContext().getString(R.string.dual_update_dialog_title), DualAppUpdatePresenter::unhold);
     }
 
-    private void showForkUpdateDialog(List<ForkRelease> newerReleases) {
+    private void showForkUpdateDialog(List<ForkRelease> newerReleases, int currentVersionCode) {
         LoadingManager.showLoading(getContext(), false);
         if (getContext() == null || getViewManager().isPlayerInForeground() || !Utils.isAppInForegroundFixed()) {
             // Defer if player is open / app backgrounded
@@ -149,9 +152,9 @@ public class DualAppUpdatePresenter extends BasePresenter<Void> {
             return;
         }
         List<OptionItem> options = new ArrayList<>();
-        // Order: newest first (releases list is sorted desc); default highlight = first
-        for (int i = 0; i < newerReleases.size(); i++) {
-            options.add(buildForkInstallOption(newerReleases.get(i), i == 0));
+        // Order: newest first (releases list is sorted desc). Marker handled per-version via classifyStatus().
+        for (ForkRelease rel : newerReleases) {
+            options.add(buildForkInstallOption(rel, currentVersionCode));
         }
         mDialog.appendStringsCategory(
                 getContext().getString(R.string.dual_update_fork_releases_category),
@@ -163,14 +166,11 @@ public class DualAppUpdatePresenter extends BasePresenter<Void> {
 
     private void pinForkUpdateSection(List<ForkRelease> newerReleases) {
         if (getContext() == null) return;
+        int currentVersionCode = getCurrentVersionCode();
         StringBuilder body = new StringBuilder();
-        for (int i = 0; i < newerReleases.size(); i++) {
-            ForkRelease rel = newerReleases.get(i);
-            body.append(String.format("%s: %s (v%d, %s)%n",
-                    i == 0 ? "★" : " ",
-                    rel.tag,
-                    rel.versionCode,
-                    rel.shortChangelog));
+        for (ForkRelease rel : newerReleases) {
+            String marker = markerFor(classifyStatus(rel.versionCode, currentVersionCode));
+            body.append(String.format("%s  %s (v%d)%n", marker, rel.tag, rel.versionCode));
         }
         body.append("\n").append(getContext().getString(R.string.dual_update_open_settings_hint));
 
@@ -180,7 +180,7 @@ public class DualAppUpdatePresenter extends BasePresenter<Void> {
                 new com.liskovsoft.smartyoutubetv2.common.app.models.errors.ErrorFragmentData() {
                     @Override
                     public void onAction() {
-                        Helpers.postOnUiThread(() -> showForkUpdateDialog(newerReleases));
+                        Helpers.postOnUiThread(() -> showForkUpdateDialog(newerReleases, getCurrentVersionCode()));
                     }
                     @Override
                     public String getMessage() {
@@ -193,14 +193,67 @@ public class DualAppUpdatePresenter extends BasePresenter<Void> {
                 });
     }
 
-    private OptionItem buildForkInstallOption(ForkRelease rel, boolean isDefault) {
-        // Subtitle includes version + size + tag
-        String subtitle = String.format("%s (v%d) • %s",
+    /**
+     * Build a single install option for a fork release. The label shows:
+     *   [STATUS MARKER] [tag] (v&lt;code&gt;) • &lt;size&gt;
+     * where STATUS MARKER is one of:
+     *   ▲ NEW       (rel.versionCode &gt; currentVersionCode)
+     *   ● CURRENT   (rel.versionCode == currentVersionCode)
+     *   ▼ OLDER     (rel.versionCode &lt; currentVersionCode, with downgrade confirmation)
+     */
+    private OptionItem buildForkInstallOption(ForkRelease rel, int currentVersionCode) {
+        int status = classifyStatus(rel.versionCode, currentVersionCode);
+        String marker = markerFor(status);
+        String label = String.format("%s  %s  %s (v%d) • %s",
+                marker,
+                getContext().getString(R.string.dual_update_install_label),
                 rel.tag,
                 rel.versionCode,
                 rel.humanSize());
-        String label = (isDefault ? "★ " : "") + getContext().getString(R.string.dual_update_install_label) + " " + subtitle;
-        return UiOptionItem.from(label, optionItem -> startForkDownloadAndInstall(rel));
+        return UiOptionItem.from(label, optionItem -> onInstallClicked(rel, status));
+    }
+
+    private void onInstallClicked(ForkRelease rel, int status) {
+        if (status == STATUS_OLDER) {
+            // Confirm before downgrading — older version may have different DB schema
+            AppDialogUtil.showConfirmationDialog(
+                    getContext(),
+                    getContext().getString(R.string.dual_update_downgrade_title),
+                    () -> {
+                        // Auto-backup before downgrade so user can come back if it breaks
+                        try {
+                            BackupAndRestoreManager backupManager = new BackupAndRestoreManager(getContext());
+                            backupManager.checkPermAndBackup();
+                        } catch (Exception ex) {
+                            Log.e(TAG, "Pre-downgrade backup failed: " + ex.getMessage(), ex);
+                        }
+                        startForkDownloadAndInstall(rel);
+                    },
+                    () -> { /* user cancelled downgrade */ });
+            return;
+        }
+        // NEWER or CURRENT — proceed directly
+        startForkDownloadAndInstall(rel);
+    }
+
+    /**
+     * Classify a release relative to the currently installed version.
+     * Note: synthetic versionCode is compared numerically, so e.g. v32.07-features-2 == 320009
+     * will compare as newer than v32.07-features-1 (320008).
+     */
+    private int classifyStatus(int releaseVersionCode, int currentVersionCode) {
+        if (releaseVersionCode > currentVersionCode) return STATUS_NEWER;
+        if (releaseVersionCode == currentVersionCode) return STATUS_CURRENT;
+        return STATUS_OLDER;
+    }
+
+    private String markerFor(int status) {
+        switch (status) {
+            case STATUS_NEWER:  return getContext().getString(R.string.dual_update_marker_newer);
+            case STATUS_CURRENT: return getContext().getString(R.string.dual_update_marker_current);
+            case STATUS_OLDER:  return getContext().getString(R.string.dual_update_marker_older);
+            default: return "";
+        }
     }
 
     /**

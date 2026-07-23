@@ -310,6 +310,13 @@
     <string name="dual_update_origin_backup_title">Create backup first?</string>
     <string name="dual_update_origin_backup_msg">A backup of your settings will be saved before installing the official version. You can restore it later from Settings → Backup &amp; Restore.</string>
     <string name="dual_update_backup_failed">Backup could not be created — proceed with caution.</string>
+    <!-- Version status markers (shown next to each release in the update dialog) -->
+    <string name="dual_update_marker_newer">▲ NEW</string>
+    <string name="dual_update_marker_current">● CURRENT</string>
+    <string name="dual_update_marker_older">▼ OLDER</string>
+    <!-- Downgrade confirmation (shown when user picks a version older than current) -->
+    <string name="dual_update_downgrade_title">⚠️ Install older version?</string>
+    <string name="dual_update_downgrade_msg">You are about to install an older version than the one currently installed.\n\nThis is a downgrade — settings may be lost if the database schema changed. A backup will be created automatically before the install.\n\nContinue?</string>
     <string name="player_autolike">Auto-like</string>
     <string name="player_autolike_enabled">Enable auto-like</string>
     <string name="player_autolike_mode">Trigger by</string>
