@@ -310,6 +310,13 @@
     <string name="dual_update_origin_backup_title">Create backup first?</string>
     <string name="dual_update_origin_backup_msg">A backup of your settings will be saved before installing the official version. You can restore it later from Settings → Backup &amp; Restore.</string>
     <string name="dual_update_backup_failed">Backup could not be created — proceed with caution.</string>
+    <!-- Origin (upstream) update info — shown when yuliskov has a newer version than the installed fork build -->
+    <string name="dual_update_origin_category">Official version available (different signature)</string>
+    <string name="dual_update_origin_install_label">Switch to official</string>
+    <string name="dual_update_origin_pin_message">Official version %1$s is available.\n\nSwitching will:\n• Lose the fork features (AutoLike, AgeCutoff, ChatFilter)\n• Reset settings (different signing key)\n• Require a manual reinstall of the fork APK to return</string>
+    <string name="dual_update_origin_pin_action">Show options</string>
+    <string name="dual_update_origin_install_title">⚠️ Install official version?</string>
+    <string name="dual_update_origin_install_msg">You are about to install the official yuliskov/SmartTube build (no fork features).\n\nA backup of your settings will be created first.</string>
     <!-- Version status markers (shown next to each release in the update dialog) -->
     <string name="dual_update_marker_newer">▲ NEW</string>
     <string name="dual_update_marker_current">● CURRENT</string>

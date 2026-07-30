@@ -56,6 +56,9 @@ public class DualAppUpdatePresenter extends BasePresenter<Void> {
     private static final int STATUS_NEWER = 0;
     private static final int STATUS_CURRENT = 1;
     private static final int STATUS_OLDER = 2;
+    // Origin (upstream) manifest URL — same as stbeta-flavor update_urls.xml (1st entry)
+    private static final String ORIGIN_MANIFEST_URL =
+            "https://github.com/yuliskov/SmartTubeNext/releases/download/latest/smarttube_beta2.json";
 
     @SuppressLint("StaticFieldLeak")
     private static DualAppUpdatePresenter sInstance;
@@ -91,11 +94,13 @@ public class DualAppUpdatePresenter extends BasePresenter<Void> {
         if (forceCheck) {
             LoadingManager.showLoading(getContext(), true);
         }
-        // Start fork check on a background thread (OkHttp + JSON parsing)
+        // Start both checks on background threads (parallel, independent results)
         new Thread(this::runForkCheck, "DualAppUpdate-ForkCheck").start();
-        // Origin check runs in parallel via the existing presenter
-        mOriginPresenter.start(false);
+        new Thread(this::runOriginCheck, "DualAppUpdate-OriginCheck").start();
     }
+
+    // Removed direct delegation to AppUpdatePresenter.start() to avoid loops and to give
+    // the origin update its own warning dialog (vs. AppUpdatePresenter's silent pin).
 
     private void runForkCheck() {
         try {
@@ -513,6 +518,206 @@ public class DualAppUpdatePresenter extends BasePresenter<Void> {
     /**
      * Simple data carrier for one fork release.
      */
+    /**
+     * Background thread: fetch the upstream manifest, compare versions, dispatch UI.
+     * The origin manifest is a JSON file with the latest versionCode and APK URLs.
+     * Source: https://github.com/yuliskov/SmartTubeNext/releases/download/latest/smarttube_beta2.json
+     */
+    private void runOriginCheck() {
+        try {
+            OriginUpdate update = fetchOriginUpdate();
+            if (update == null) {
+                Log.d(TAG, "Origin: no update available");
+                return;
+            }
+            int[] installedComps = getInstalledVersionComponents();
+            // Origin is newer iff origin.versionCode > installed upstream versionCode.
+            // Since our fork keeps upstream's versionCode (e.g. 2400 = 32.10), the origin
+            // versionCode > installed.versionCode means "you should update" (or stay equal).
+            PackageInfo info = getContext().getPackageManager()
+                    .getPackageInfo(getContext().getPackageName(), 0);
+            int installedVersionCode = info.versionCode;
+            if (update.versionCode > installedVersionCode) {
+                Helpers.postOnUiThread(() -> handleOriginUpdate(update));
+            } else {
+                Log.d(TAG, "Origin: same versionCode as installed (" + installedVersionCode + ")");
+            }
+        } catch (Exception ex) {
+            Log.e(TAG, "Origin update check failed: " + ex.getMessage(), ex);
+        }
+    }
+
+    private void handleOriginUpdate(OriginUpdate update) {
+        if (getContext() == null) return;
+        // Only pin if we're NOT in the middle of a dialog (origin auto-check is silent).
+        // For forceCheck, show dialog directly with warning.
+        if (mIsForceCheck) {
+            LoadingManager.showLoading(getContext(), false);
+            showOriginUpdateDialog(update);
+        } else {
+            pinOriginUpdateSection(update);
+        }
+    }
+
+    private void showOriginUpdateDialog(OriginUpdate update) {
+        if (getContext() == null) return;
+        mDialog.appendStringsCategory(
+                getContext().getString(R.string.dual_update_origin_category),
+                java.util.Collections.singletonList(buildOriginInstallOption(update)));
+        mDialog.showDialog(getContext().getString(R.string.dual_update_dialog_title),
+                DualAppUpdatePresenter::unhold);
+    }
+
+    private OptionItem buildOriginInstallOption(OriginUpdate update) {
+        String label = String.format("%s  %s  v%s (code %d) • %s",
+                "⚠️",
+                getContext().getString(R.string.dual_update_origin_install_label),
+                update.versionName,
+                update.versionCode,
+                update.humanSize());
+        return UiOptionItem.from(label, optionItem -> onOriginInstallClicked(update));
+    }
+
+    private void onOriginInstallClicked(OriginUpdate update) {
+        // Confirmation dialog with warning + auto-backup before origin install
+        AppDialogUtil.showConfirmationDialog(
+                getContext(),
+                getContext().getString(R.string.dual_update_origin_install_title),
+                () -> {
+                    try {
+                        BackupAndRestoreManager backupManager = new BackupAndRestoreManager(getContext());
+                        backupManager.checkPermAndBackup();
+                    } catch (Exception ex) {
+                        Log.e(TAG, "Pre-origin backup failed: " + ex.getMessage(), ex);
+                        MessageHelpers.showLongMessage(getContext(),
+                                R.string.dual_update_backup_failed);
+                    }
+                    startOriginDownloadAndInstall(update);
+                },
+                () -> { /* user cancelled */ });
+    }
+
+    private void startOriginDownloadAndInstall(OriginUpdate update) {
+        LoadingManager.showLoading(getContext(), true);
+        new Thread(() -> {
+            try {
+                String apkPath = downloadOriginApk(update);
+                Helpers.postOnUiThread(() -> {
+                    LoadingManager.showLoading(getContext(), false);
+                    if (apkPath != null) {
+                        Helpers.installPackage(getContext(), apkPath);
+                    } else {
+                        MessageHelpers.showLongMessage(getContext(),
+                                R.string.dual_update_download_failed);
+                    }
+                });
+            } catch (Exception ex) {
+                Log.e(TAG, "Origin APK download failed: " + ex.getMessage(), ex);
+                Helpers.postOnUiThread(() -> {
+                    LoadingManager.showLoading(getContext(), false);
+                    MessageHelpers.showLongMessage(getContext(),
+                            R.string.dual_update_download_failed);
+                });
+            }
+        }, "DualAppUpdate-OriginDownload").start();
+    }
+
+    private String downloadOriginApk(OriginUpdate update) throws Exception {
+        File cacheDir = getContext().getCacheDir();
+        File outFile = new File(cacheDir, "origin_update_" + update.versionCode + ".apk");
+        okhttp3.Response response = OkHttpManager.instance().doGetRequest(update.apkUrl);
+        if (response == null || !response.isSuccessful() || response.body() == null) {
+            return null;
+        }
+        try (java.io.InputStream in = response.body().byteStream();
+             java.io.FileOutputStream out = new java.io.FileOutputStream(outFile)) {
+            byte[] buf = new byte[8192];
+            int n;
+            while ((n = in.read(buf)) > 0) {
+                out.write(buf, 0, n);
+            }
+            out.flush();
+        }
+        return outFile.getAbsolutePath();
+    }
+
+    private void pinOriginUpdateSection(OriginUpdate update) {
+        if (getContext() == null) return;
+        String body = String.format(
+                getContext().getString(R.string.dual_update_origin_pin_message),
+                update.versionName);
+        BrowsePresenter.instance(getContext()).pinItem(
+                getContext().getString(R.string.dual_update_dialog_title),
+                R.drawable.action_info,
+                new com.liskovsoft.smartyoutubetv2.common.app.models.errors.ErrorFragmentData() {
+                    @Override
+                    public void onAction() {
+                        Helpers.postOnUiThread(() -> showOriginUpdateDialog(update));
+                    }
+                    @Override
+                    public String getMessage() {
+                        return body;
+                    }
+                    @Override
+                    public String getActionText() {
+                        return getContext().getString(R.string.dual_update_origin_pin_action);
+                    }
+                });
+    }
+
+    /**
+     * Fetch origin manifest, parse latest version entry, return OriginUpdate or null.
+     * Manifest format: { "package": { "downloadUrlList": [...] }, "<versionName>": { "versionCode": N, "changelog": [...] } }
+     */
+    private OriginUpdate fetchOriginUpdate() throws Exception {
+        okhttp3.Response response = OkHttpManager.instance().doGetRequest(ORIGIN_MANIFEST_URL);
+        if (response == null || !response.isSuccessful() || response.body() == null) {
+            throw new IllegalStateException("Origin manifest responded " +
+                    (response != null ? response.code() : "null"));
+        }
+        String body = response.body().string();
+        response.close();
+        org.json.JSONObject root = new org.json.JSONObject(body);
+        org.json.JSONObject pkg = root.optJSONObject("package");
+        if (pkg == null) return null;
+        // Pick the first available URL (architecture-specific lists are present, default first works)
+        String apkUrl = null;
+        long apkSize = 0;
+        String[] urlKeys = {"downloadUrlList", "downloadUrlList_arm64-v8a", "downloadUrlList_armeabi-v7a", "downloadUrlList_x86", "downloadUrl"};
+        for (String key : urlKeys) {
+            org.json.JSONArray list = pkg.optJSONArray(key);
+            if (list != null && list.length() > 0) {
+                apkUrl = list.getString(0);
+                break;
+            }
+        }
+        if (apkUrl == null) return null;
+        // Find latest version entry: highest versionCode
+        int latestCode = 0;
+        String latestName = null;
+        org.json.JSONArray latestChangelog = null;
+        java.util.Iterator<String> keys = root.keys();
+        while (keys.hasNext()) {
+            String k = keys.next();
+            if ("package".equals(k)) continue;
+            org.json.JSONObject v = root.optJSONObject(k);
+            if (v == null) continue;
+            int code = v.optInt("versionCode", 0);
+            if (code > latestCode) {
+                latestCode = code;
+                latestName = k;
+                latestChangelog = v.optJSONArray("changelog");
+            }
+        }
+        if (latestName == null) return null;
+        OriginUpdate u = new OriginUpdate();
+        u.versionName = latestName;
+        u.versionCode = latestCode;
+        u.apkUrl = apkUrl;
+        u.changelog = latestChangelog;
+        return u;
+    }
+
     private static class ForkRelease {
         String tag;
         int[] tagComponents;  // [major, minor, patch, featuresN]
@@ -527,6 +732,20 @@ public class DualAppUpdatePresenter extends BasePresenter<Void> {
                 return String.format("%.1f MB", sizeBytes / (1024.0 * 1024.0));
             }
             return String.format("%.0f KB", sizeBytes / 1024.0);
+        }
+    }
+
+    /**
+     * Data carrier for upstream/yuliskov update info.
+     */
+    private static class OriginUpdate {
+        String versionName;
+        int versionCode;
+        String apkUrl;
+        org.json.JSONArray changelog;
+
+        String humanSize() {
+            return "?";
         }
     }
 }
