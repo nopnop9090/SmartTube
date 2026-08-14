@@ -713,22 +713,36 @@ public class PlaybackFragment extends SeekModePlaybackFragment implements Playba
         }
 
         long thresholdMs;
+        String triggerDescription; // human-readable trigger for overlay text
         if (tweaks.getAutoLikeMode() == PlayerTweaksData.AUTOLIKE_MODE_PERCENT) {
             int percent = tweaks.getAutoLikeValue();
             percent = Math.max(1, Math.min(99, percent));
             thresholdMs = (long) (durationMs * (percent / 100.0));
+            triggerDescription = getContext().getString(R.string.player_autolike_overlay_at_percent, percent);
         } else {
             int seconds = Math.max(0, tweaks.getAutoLikeValue());
             thresholdMs = seconds * 1_000L;
+            triggerDescription = getContext().getString(R.string.player_autolike_overlay_after_min, Math.max(1, seconds / 60));
         }
 
         if (currentPositionMs >= thresholdMs) {
             boolean willLike = mPlayerGlue != null && mPlayerGlue.getButtonState(R.id.action_thumbs_up) == PlayerUI.BUTTON_OFF;
             ensureCurrentVideoLiked();
+            long restMs = Math.max(0, durationMs - currentPositionMs);
+            String restStr = getContext().getString(R.string.player_autolike_overlay_remaining, humanRestMs(restMs));
             showWatchOverlay(willLike
-                    ? "AutoLike: Video wurde geliked."
-                    : "AutoLike: Video ist bereits geliked.");
+                    ? triggerDescription + " — " + getContext().getString(R.string.player_autolike_liked) + ". " + restStr
+                    : triggerDescription + " — " + getContext().getString(R.string.player_autolike_already_liked) + ". " + restStr);
         }
+    }
+
+    private static String humanRestMs(long ms) {
+        if (ms < 0) return "?";
+        long totalSec = ms / 1000;
+        long h = totalSec / 3600;
+        long m = (totalSec % 3600) / 60;
+        if (h > 0) return h + "h " + m + "m";
+        return m + "m";
     }
 
     private void ensureCurrentVideoLiked() {

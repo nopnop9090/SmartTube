@@ -335,6 +335,11 @@
     <string name="player_autolike_overlay_duration_val">%s s</string>
     <string name="player_autolike_overlay_dimming">Overlay dimming</string>
     <string name="player_autolike_overlay_dimming_val">%s%%</string>
+    <string name="player_autolike_overlay_at_percent">AutoLike at %d%%</string>
+    <string name="player_autolike_overlay_after_min">AutoLike after %d min</string>
+    <string name="player_autolike_overlay_remaining">(%s remaining)</string>
+    <string name="player_autolike_liked">Video was liked</string>
+    <string name="player_autolike_already_liked">Video was already liked</string>
     <!-- Age cutoff (upload-date filter) — used by GeneralSettingsPresenter -->
     <string name="age_cutoff">Age cutoff</string>
     <string name="age_cutoff_off">Off</string>
