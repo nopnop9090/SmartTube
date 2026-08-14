@@ -13,7 +13,6 @@ public class BufferingDetector {
     private long mTotalDurationMs;
     private final Runnable mOnLongBuffering = this::onLongBuffering;
     private final OnLongBuffering mCallback;
-    private boolean mIsPlayable;
 
     public interface OnLongBuffering {
         void onLongBuffering();
@@ -37,12 +36,6 @@ public class BufferingDetector {
         Utils.removeCallbacks(mOnLongBuffering);
         long stopTimeMs = System.currentTimeMillis();
         mTotalDurationMs += (stopTimeMs - mStartTimeMs);
-        mIsPlayable = true;
-    }
-
-    public void start() {
-        mIsPlayable = false;
-        reset();
     }
 
     /**
@@ -51,10 +44,6 @@ public class BufferingDetector {
     public void reset() {
         mBeginTimeMs = mStartTimeMs = mTotalDurationMs = 0;
         Utils.removeCallbacks(mOnLongBuffering);
-    }
-
-    public boolean isPlayable() {
-        return mIsPlayable;
     }
 
     private void onLongBuffering() {

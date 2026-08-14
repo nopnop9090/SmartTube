@@ -1,6 +1,15 @@
 [<img src="images/badge_fdroid.png" alt="Get it on F-Droid" height="80">](https://f-droid.org/packages/app.smarttube.fdroid/)
 [<img src="images/badge_github.png" alt="Get it on GitHub" height="80">](https://github.com/yuliskov/SmartTube/releases)
 
+> ⚠️ **You are looking at a personal fork of [yuliskov/SmartTube](https://github.com/yuliskov/SmartTube).**
+>
+> This fork adds three personal-utility features (Auto-Like, Age Cutoff, LiveChat Filter) that are **not in upstream**.
+> The original SmartTube is maintained by yuliskov — please support their work, not this fork.
+>
+> **For documentation of the three extra features, see [FORK_FEATURES.md](./FORK_FEATURES.md).**
+> For the official SmartTube releases, see https://github.com/yuliskov/SmartTube/releases.
+> For this fork's releases, see https://github.com/nopnop9090/SmartTube/releases.
+
 # Important announcement about the app
 
 My development environment was infected by unknown malicious software, as a result of which a few builds may have been affected. Once the issue was detected, I secured everything with a full disk wipe, restored a clean setup, and now all builds are scanned with VirusTotal. The F-Droid version will also be verified before release.
@@ -345,9 +354,9 @@ A: No, this only works on **Android** devices. If you look at an Android TV's pr
 
 A: **Big No**. This app is **not** for smartphones, we offer **zero support** for that.
 
-You **can cast** videos **from** your smartphone to a TV / TV box running SmartTube, though. Just use the official YouTube app, [Morphe](https://github.com/MorpheApp) or [ReVanced](https://github.com/ReVanced), see [the casting section](#casting) for more information.
+You **can cast** videos **from** your smartphone to a TV / TV box running SmartTube, though. Just use the official YouTube app or [ReVanced](https://github.com/ReVanced), see [the casting section](#casting) for more information.
 
-**There will not be a phone version.** You can use [Morphe](https://github.com/MorpheApp), [ReVanced](https://github.com/ReVanced), [Pure Tuber](https://play.google.com/store/apps/details?id=free.tube.premium.advanced.tuber), [LibreTube](https://github.com/libre-tube/LibreTube), [NewPipe](https://newpipe.schabi.org), or [NewPipe x SponsorBlock](https://github.com/polymorphicshade/NewPipe#newpipe-x-sponsorblock) instead. Please go to their respective support chats for help.
+**There will not be a phone version.** You can use [ReVanced](https://github.com/ReVanced), [Pure Tuber](https://play.google.com/store/apps/details?id=free.tube.premium.advanced.tuber), [LibreTube](https://github.com/libre-tube/LibreTube), [NewPipe](https://newpipe.schabi.org), or [NewPipe x SponsorBlock](https://github.com/polymorphicshade/NewPipe#newpipe-x-sponsorblock) instead. Please go to their respective support chats for help.
 
 
 ### Q: Can I install this on a tablet / car screen / smartphone with docking station?

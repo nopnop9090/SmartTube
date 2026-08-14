@@ -292,6 +292,55 @@
     <string name="removed_from_history">Video has been removed from history</string>
     <string name="remove_from_history">Remove from history</string>
     <string name="upload_date">Upload date</string>
+    <string name="player_chat_filter">Chat filter</string>
+    <string name="player_chat_filter_hide_bots">Hide bot accounts (Streamlabs, Nightbot, etc.)</string>
+    <string name="player_chat_filter_hide_commands">Hide messages starting with !</string>
+    <!-- Dual-mode update (fork vs origin) — used by DualAppUpdatePresenter -->
+    <string name="dual_update_dialog_title">Software update</string>
+    <string name="dual_update_fork_releases_category">Fork releases available</string>
+    <string name="dual_update_no_updates_available">No updates — showing latest 3 for reinstall</string>
+    <string name="dual_update_install_label">Install</string>
+    <string name="dual_update_fork_check_failed">Could not check fork releases. Please try again.</string>
+    <string name="dual_update_download_failed">Download failed. Please check your network.</string>
+    <string name="dual_update_found_in_sidebar">Update available</string>
+    <string name="dual_update_open_settings_hint">Open Update settings</string>
+    <string name="dual_update_open_settings_action">Show updates</string>
+    <string name="dual_update_origin_warning_title">⚠️ Switch to official version?</string>
+    <string name="dual_update_origin_warning_msg">You will lose the fork features (AutoLike, AgeCutoff, ChatFilter). Settings will be reset because the signature differs. Continue?</string>
+    <string name="dual_update_origin_backup_title">Create backup first?</string>
+    <string name="dual_update_origin_backup_msg">A backup of your settings will be saved before installing the official version. You can restore it later from Settings → Backup &amp; Restore.</string>
+    <string name="dual_update_backup_failed">Backup could not be created — proceed with caution.</string>
+    <!-- Origin (upstream) update info — shown when yuliskov has a newer version than the installed fork build -->
+    <string name="dual_update_origin_category">Official version available (different signature)</string>
+    <string name="dual_update_origin_install_label">Switch to official</string>
+    <string name="dual_update_origin_pin_message">Official version %1$s is available.\n\nSwitching will:\n• Lose the fork features (AutoLike, AgeCutoff, ChatFilter)\n• Reset settings (different signing key)\n• Require a manual reinstall of the fork APK to return</string>
+    <string name="dual_update_origin_pin_action">Show options</string>
+    <string name="dual_update_origin_install_title">⚠️ Install official version?</string>
+    <string name="dual_update_origin_install_msg">You are about to install the official yuliskov/SmartTube build (no fork features).\n\nA backup of your settings will be created first.</string>
+    <!-- Version status markers (shown next to each release in the update dialog) -->
+    <string name="dual_update_marker_newer">▲ NEW</string>
+    <string name="dual_update_marker_current">● CURRENT</string>
+    <string name="dual_update_marker_older">▼ OLDER</string>
+    <!-- Downgrade confirmation (shown when user picks a version older than current) -->
+    <string name="dual_update_downgrade_title">⚠️ Install older version?</string>
+    <string name="dual_update_downgrade_msg">You are about to install an older version than the one currently installed.\n\nThis is a downgrade — settings may be lost if the database schema changed. A backup will be created automatically before the install.\n\nContinue?</string>
+    <string name="player_autolike">Auto-like</string>
+    <string name="player_autolike_enabled">Enable auto-like</string>
+    <string name="player_autolike_mode">Trigger by</string>
+    <string name="player_autolike_value_seconds">After %s seconds</string>
+    <string name="player_autolike_value_percent">After %s%%</string>
+    <string name="player_autolike_min_duration">Minimum video length</string>
+    <string name="player_autolike_min_duration_val">%s min</string>
+    <string name="player_autolike_overlay_duration">Overlay duration</string>
+    <string name="player_autolike_overlay_duration_val">%s s</string>
+    <string name="player_autolike_overlay_dimming">Overlay dimming</string>
+    <string name="player_autolike_overlay_dimming_val">%s%%</string>
+    <!-- Age cutoff (upload-date filter) — used by GeneralSettingsPresenter -->
+    <string name="age_cutoff">Age cutoff</string>
+    <string name="age_cutoff_off">Off</string>
+    <string name="age_cutoff_1_day">1 day</string>
+    <string name="age_cutoff_1_week">1 week</string>
+    <string name="age_cutoff_n_months">%d months</string>
     <string name="upload_date_any">All time</string>
     <string name="upload_date_today">Today</string>
     <string name="upload_date_this_week">This week</string>
@@ -370,6 +419,7 @@
     <string name="proxy_not_supported">Use Web Proxy (Needs Android 4.4+)</string>
     <string name="proxy_test_btn">Test</string>
     <string name="proxy_settings_title">Proxy Server Settings</string>
+    <string name="proxy_test_urls">https://www.youtube.com\nhttps://www.google.com</string>
     <string name="proxy_test_cancelled">Test #%d: cancelled.</string>
     <string name="proxy_type_invalid">Proxy type not set.</string>
     <string name="proxy_host_invalid">Proxy host not set.</string>
@@ -416,8 +466,8 @@
     <string name="remember_position_of_short_videos">Remember position of short videos (less than 5 min)</string>
     <string name="remember_position_of_live_videos">Remember live stream position</string>
     <string name="player_show_tooltips">Show button tooltips</string>
-    <string name="action_like_unset">Removed like</string>
-    <string name="action_dislike_unset">Removed dislike</string>
+    <string name="action_like_unset">removed like</string>
+    <string name="action_dislike_unset">removed dislike</string>
     <string name="various_buttons">Buttons at the top of the main window</string>
     <string name="not_compatible_with">Selected option isn\'t compatible with</string>
     <string name="subtitle_position">Subtitle bottom shift</string>
