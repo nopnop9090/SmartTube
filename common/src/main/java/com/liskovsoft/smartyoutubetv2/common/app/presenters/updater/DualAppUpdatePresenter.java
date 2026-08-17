@@ -27,10 +27,13 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.io.File;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.Date;
 import java.util.List;
+import java.util.TimeZone;
 
 import okhttp3.Response;
 
@@ -211,11 +214,13 @@ public class DualAppUpdatePresenter extends BasePresenter<Void> {
     private OptionItem buildForkInstallOption(ForkRelease rel, int[] installedComps) {
         int status = rel.status;
         String marker = markerFor(status);
-        String label = String.format("%s  %s  %s • %s",
+        String dateStr = rel.humanPublishedAt();
+        String label = String.format("%s  %s  %s • %s%s",
                 marker,
                 getContext().getString(R.string.dual_update_install_label),
                 rel.tag,
-                rel.humanSize());
+                rel.humanSize(),
+                dateStr.isEmpty() ? "" : " • " + dateStr);
         return UiOptionItem.from(label, optionItem -> onInstallClicked(rel, status));
     }
 
@@ -399,6 +404,7 @@ public class DualAppUpdatePresenter extends BasePresenter<Void> {
             fr.apkUrl = apkUrl;
             fr.sizeBytes = relSizeFromAssets(rel.optJSONArray("assets"));
             fr.shortChangelog = shortenChangelog(rel.optString("body", ""));
+            fr.publishedAt = rel.optString("published_at", "");
             result.add(fr);
         }
         // Sort by tag components desc (major.minor.patch.featuresN lexicographic)
@@ -724,6 +730,7 @@ public class DualAppUpdatePresenter extends BasePresenter<Void> {
         String apkUrl;
         long sizeBytes;
         String shortChangelog;
+        String publishedAt;  // ISO-8601 from GitHub, e.g. "2026-08-15T18:42:13Z"
         int status = STATUS_CURRENT;  // pre-computed in runForkCheck via classifyStatus()
 
         String humanSize() {
@@ -732,6 +739,25 @@ public class DualAppUpdatePresenter extends BasePresenter<Void> {
                 return String.format("%.1f MB", sizeBytes / (1024.0 * 1024.0));
             }
             return String.format("%.0f KB", sizeBytes / 1024.0);
+        }
+
+        /**
+         * Format GitHub's ISO-8601 publish time as "dd.MM.yyyy HH:mm" (local TZ).
+         * Returns "" if parsing fails — caller drops the segment from the label.
+         */
+        String humanPublishedAt() {
+            if (publishedAt == null || publishedAt.isEmpty()) return "";
+            try {
+                SimpleDateFormat iso = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'");
+                iso.setTimeZone(TimeZone.getTimeZone("UTC"));
+                Date parsed = iso.parse(publishedAt);
+                if (parsed == null) return "";
+                SimpleDateFormat out = new SimpleDateFormat("dd.MM.yyyy HH:mm");
+                out.setTimeZone(TimeZone.getDefault());
+                return out.format(parsed);
+            } catch (Exception ex) {
+                return "";
+            }
         }
     }
 
