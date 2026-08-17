@@ -39,10 +39,6 @@ public class ErrorFixerController extends BasePlayerController implements OnLong
 
     @Override
     public void onLongBuffering() {
-        if (getPlayer() == null) {
-            return;
-        }
-
         if (isStreamEnded()) {
             getMainController().onPlayEnd();
         } else if (isOfflineVideo() && isSubtitlesEnabled()) {
@@ -55,8 +51,13 @@ public class ErrorFixerController extends BasePlayerController implements OnLong
             mVideoLoaderController.reloadVideo();
         } else if (!getPlayerTweaksData().isNetworkErrorFixingDisabled()) {
             // Possibly ISP ban
+            //if (!isFasterDataSourceEnabled()) {
+            //    enableFasterDataSource();
+            //    restartEngine();
+            //}
+
             //switchNextEngine();
-            //mVideoLoaderController.restartEngine();
+            //restartEngine();
 
             // NOTE: The bug. Avoid calling reloadVideo() after lowering the quality.
             // This will change current format to 'Disabled'. Do restartEngine() instead.
@@ -73,9 +74,6 @@ public class ErrorFixerController extends BasePlayerController implements OnLong
     @Override
     public void onSeekEnd() {
         mBufferingDetector.reset();
-        // Needed to detect additional buffering (e.g. hanged clients).
-        // Don't worry this event will be canceled by subsequent onPlay() or onPause() if everything is ok.
-        mBufferingDetector.onStartBuffering();
     }
 
     @Override
@@ -90,7 +88,7 @@ public class ErrorFixerController extends BasePlayerController implements OnLong
 
     @Override
     public void onNewVideo(Video item) {
-        mBufferingDetector.start();
+        mBufferingDetector.reset();
     }
 
     @Override
@@ -205,9 +203,8 @@ public class ErrorFixerController extends BasePlayerController implements OnLong
         } else if (type == PlayerEventListener.ERROR_TYPE_UNEXPECTED) {
             // IllegalStateException: Buffer too small (5242880 < 7208383)
             if (Helpers.startsWithAny(errorContent, "Buffer too small", "Invalid to call at Released state; only valid in executing state")) {
-                // NOTE: The bug. Avoid calling reloadVideo() after lowering the quality.
-                // This will change current format to 'Disabled'. Do restartEngine() instead.
                 lowerVideoQuality();
+                //restartEngine = false;
             }
         }
 
@@ -374,10 +371,6 @@ public class ErrorFixerController extends BasePlayerController implements OnLong
         return !getVideo().isLive && !getVideo().isLiveEnd;
     }
 
-    /**
-     * NOTE: The bug. Avoid calling reloadVideo() after lowering the quality.<br/>
-     * This will change current format to 'Disabled'. Do reloadEngine() instead.
-     */
     private void lowerVideoQuality() {
         if (getPlayer() == null) {
             return;
