@@ -80,11 +80,13 @@ public class ExoPlayerController implements Player.EventListener {
     }
 
     public void openSabr(MediaItemFormatInfo formatInfo) {
+        detectAgeRestriction(formatInfo);
         MediaSource mediaSource = mMediaSourceFactory.fromSabrFormatInfo(formatInfo);
         openMediaSource(mediaSource);
     }
 
     public void openDash(MediaItemFormatInfo formatInfo) {
+        detectAgeRestriction(formatInfo);
         MediaSource mediaSource = mMediaSourceFactory.fromDashFormatInfo(formatInfo);
         openMediaSource(mediaSource);
     }
@@ -451,6 +453,20 @@ public class ExoPlayerController implements Player.EventListener {
     private void setQualityInfo(String qualityInfoStr) {
         if (mPlayerView != null && qualityInfoStr != null) {
             mPlayerView.setQualityInfo(qualityInfoStr);
+        }
+    }
+
+    /**
+     * FORK ADDITION: detect age-restricted video via YouTube playability reason and forward to UI.
+     * YouTube signals restricted videos with reason containing AGE_ (AGE_CHECK_REQUIRED, AGE_VERIFICATION_REQUIRED).
+     * Hardcoded, no settings switch (minimal-invasive pattern).
+     */
+    private void detectAgeRestriction(MediaItemFormatInfo formatInfo) {
+        if (formatInfo == null) return;
+        String reason = formatInfo.getPlayabilityReason();
+        boolean isAgeRestricted = reason != null && reason.contains("AGE_");
+        if (mPlayerView != null) {
+            mPlayerView.setAgeRestriction(isAgeRestricted);
         }
     }
 

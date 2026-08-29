@@ -118,9 +118,26 @@
                             android:layout_centerVertical="true"
                             android:focusable="false" >
                 <TextView
+                    android:id="@+id/age_restriction_badge"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_alignParentEnd="true"
+                    android:layout_marginEnd="8dp"
+                    android:paddingStart="6dp"
+                    android:paddingEnd="6dp"
+                    android:paddingTop="2dp"
+                    android:paddingBottom="2dp"
+                    android:background="#CC000000"
+                    android:text="@string/age_restricted_badge"
+                    android:textColor="#FFFF6E6E"
+                    android:textStyle="bold"
+                    android:visibility="gone"
+                    style="?attr/playbackControlsTimeStyle" />
+                <TextView
                     android:id="@+id/quality_info"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
+                    android:layout_below="@+id/age_restriction_badge"
                     android:layout_alignParentEnd="true"
                     style="?attr/playbackControlsTimeStyle" />
                 <com.liskovsoft.smartyoutubetv2.tv.ui.widgets.time.DateTimeView
