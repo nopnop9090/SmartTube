@@ -3,16 +3,20 @@ package com.liskovsoft.smartyoutubetv2.tv.ui.playback;
 import android.media.session.PlaybackState;
 import android.os.Build.VERSION;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.support.v4.media.MediaMetadataCompat;
 import android.support.v4.media.session.MediaSessionCompat;
 import android.support.v4.media.session.PlaybackStateCompat;
 import android.text.TextUtils;
+import android.graphics.Color;
 import android.view.KeyEvent;
 import android.view.LayoutInflater;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.ViewStub;
+import android.widget.TextView;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -125,6 +129,25 @@ public class PlaybackFragment extends SeekModePlaybackFragment implements Playba
     private Boolean mIsControlsShownPreviously;
     private Video mPendingFocus;
     private String mSelectedVideoId;
+    // Autolike
+    private boolean mHasAutoLikedCurrentVideo;
+    private final Handler mWatchOverlayHandler = new Handler(Looper.getMainLooper());
+    private final Runnable mWatchOverlayRunnable = new Runnable() {
+        @Override
+        public void run() {
+            long durationMs = getDurationMs();
+            if (durationMs > 0) {
+                checkWatchOverlayTriggers(getPositionMs(), durationMs);
+            }
+            mWatchOverlayHandler.postDelayed(this, WATCH_OVERLAY_UPDATE_INTERVAL_MS);
+        }
+    };
+    private final Runnable mHideWatchOverlayRunnable = this::hideWatchOverlay;
+    // Watch overlay views
+    private View mWatchOverlayBackground;
+    private TextView mWatchOverlayMessage;
+
+    private static final int WATCH_OVERLAY_UPDATE_INTERVAL_MS = 500;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -236,6 +259,8 @@ public class PlaybackFragment extends SeekModePlaybackFragment implements Playba
         showHideWidgets(true); // PIP mode fix
         blockEngine(false); // reset bg mode
         //ExoPlayerInitializer.enableAudioFocus(mPlayer, true); // Restore focus after PIP
+
+        startWatchOverlayUpdates();
     }
 
     @Override
@@ -251,6 +276,8 @@ public class PlaybackFragment extends SeekModePlaybackFragment implements Playba
 
         showHideWidgets(false); // PIP mode fix
         //ExoPlayerInitializer.enableAudioFocus(mPlayer, false); // Disable focus in PIP
+
+        stopWatchOverlayUpdates();
     }
 
     public void onDispatchKeyEvent(KeyEvent event) {
@@ -273,15 +300,14 @@ public class PlaybackFragment extends SeekModePlaybackFragment implements Playba
     }
 
     private void applyTickle(MotionEvent event) {
-        if (getView() != null && !isOverlayShown()) {
-            getView().requestFocus(); // fix mouse DPAD emulation on API 28+
-        }
-
         if (event.getAction() == MotionEvent.ACTION_DOWN) {
             tickle(); // show Player UI
         }
 
         mPlaybackPresenter.onKeyDown(-1); // reset ui timer
+        if (getView() != null) {
+            getView().requestFocus(); // fix mouse DPAD emulation on API 28+
+        }
     }
 
     public void onFinish() {
@@ -439,7 +465,6 @@ public class PlaybackFragment extends SeekModePlaybackFragment implements Playba
             mDebugInfoManager.show(false);
             mDebugInfoManager = null;
         }
-        mPlayerInitializer.release();
         // Fix access calls when player isn't initialized
         mExoPlayerController.release();
         mPlayer = null;
@@ -475,6 +500,8 @@ public class PlaybackFragment extends SeekModePlaybackFragment implements Playba
         initializePixelRatio();
 
         initializeDoubleTapHandler();
+
+        initializeWatchOverlay();
     }
 
     private void createPlayer() {
@@ -603,6 +630,131 @@ public class PlaybackFragment extends SeekModePlaybackFragment implements Playba
                 return false;
             }
         });
+    }
+
+    private void initializeWatchOverlay() {
+        if (getView() == null) {
+            return;
+        }
+
+        if (mWatchOverlayBackground == null) {
+            mWatchOverlayBackground = getView().findViewById(R.id.watch_overlay_background);
+        }
+
+        if (mWatchOverlayMessage == null) {
+            View messageView = getView().findViewById(R.id.watch_overlay_message);
+            mWatchOverlayMessage = messageView instanceof TextView ? (TextView) messageView : null;
+        }
+    }
+
+    private void showWatchOverlay(String message) {
+        if (mWatchOverlayBackground == null || mWatchOverlayMessage == null) {
+            return;
+        }
+
+        int duration = getPlayerTweaksData().getAutoLikeOverlayDurationSec();
+        if (duration == 0) {
+            return;
+        }
+
+        int dimmingPercent = getPlayerTweaksData().getAutoLikeOverlayDimmingPercent();
+        if (dimmingPercent > 0) {
+            int alpha = (int) (dimmingPercent / 100f * 255);
+            mWatchOverlayBackground.setBackgroundColor(Color.argb(alpha, 0, 0, 0));
+        }
+
+        mWatchOverlayMessage.setText(message);
+        mWatchOverlayBackground.setVisibility(View.VISIBLE);
+        mWatchOverlayMessage.setVisibility(View.VISIBLE);
+
+        mWatchOverlayHandler.removeCallbacks(mHideWatchOverlayRunnable);
+        mWatchOverlayHandler.postDelayed(mHideWatchOverlayRunnable, duration * 1_000L);
+    }
+
+    private void hideWatchOverlay() {
+        if (mWatchOverlayBackground != null) {
+            mWatchOverlayBackground.setVisibility(View.GONE);
+        }
+        if (mWatchOverlayMessage != null) {
+            mWatchOverlayMessage.setVisibility(View.GONE);
+        }
+        mWatchOverlayHandler.removeCallbacks(mHideWatchOverlayRunnable);
+    }
+
+    private void resetWatchOverlayState() {
+        mHasAutoLikedCurrentVideo = false;
+    }
+
+    private void startWatchOverlayUpdates() {
+        mWatchOverlayHandler.removeCallbacks(mWatchOverlayRunnable);
+        mWatchOverlayHandler.post(mWatchOverlayRunnable);
+    }
+
+    private void stopWatchOverlayUpdates() {
+        mWatchOverlayHandler.removeCallbacks(mWatchOverlayRunnable);
+        hideWatchOverlay();
+    }
+
+    private void checkWatchOverlayTriggers(long currentPositionMs, long durationMs) {
+        PlayerTweaksData tweaks = getPlayerTweaksData();
+        if (tweaks == null || !tweaks.isAutoLikeEnabled() || mHasAutoLikedCurrentVideo) {
+            return;
+        }
+
+        // Auto-Like bei Livestreams deaktivieren — vermeidet wiederholte "bereits geliked"-Meldungen
+        Video currentVideo = getVideo();
+        if (currentVideo != null && currentVideo.isLive) {
+            return;
+        }
+
+        long minDurationMs = Math.max(0, tweaks.getAutoLikeMinDurationSec()) * 1_000L;
+        if (durationMs < minDurationMs) {
+            return;
+        }
+
+        long thresholdMs;
+        String triggerDescription; // human-readable trigger for overlay text
+        if (tweaks.getAutoLikeMode() == PlayerTweaksData.AUTOLIKE_MODE_PERCENT) {
+            int percent = tweaks.getAutoLikeValue();
+            percent = Math.max(1, Math.min(99, percent));
+            thresholdMs = (long) (durationMs * (percent / 100.0));
+            triggerDescription = getContext().getString(R.string.player_autolike_overlay_at_percent, percent);
+        } else {
+            int seconds = Math.max(0, tweaks.getAutoLikeValue());
+            thresholdMs = seconds * 1_000L;
+            triggerDescription = getContext().getString(R.string.player_autolike_overlay_after_min, Math.max(1, seconds / 60));
+        }
+
+        if (currentPositionMs >= thresholdMs) {
+            boolean willLike = mPlayerGlue != null && mPlayerGlue.getButtonState(R.id.action_thumbs_up) == PlayerUI.BUTTON_OFF;
+            ensureCurrentVideoLiked();
+            long restMs = Math.max(0, durationMs - currentPositionMs);
+            String restStr = getContext().getString(R.string.player_autolike_overlay_remaining, humanRestMs(restMs));
+            showWatchOverlay(willLike
+                    ? triggerDescription + " — " + getContext().getString(R.string.player_autolike_liked) + ". " + restStr
+                    : triggerDescription + " — " + getContext().getString(R.string.player_autolike_already_liked) + ". " + restStr);
+        }
+    }
+
+    private static String humanRestMs(long ms) {
+        if (ms < 0) return "?";
+        long totalSec = ms / 1000;
+        long h = totalSec / 3600;
+        long m = (totalSec % 3600) / 60;
+        if (h > 0) return h + "h " + m + "m";
+        return m + "m";
+    }
+
+    private void ensureCurrentVideoLiked() {
+        if (mPlayerGlue == null || mPlaybackPresenter == null) {
+            return;
+        }
+
+        int currentState = mPlayerGlue.getButtonState(R.id.action_thumbs_up);
+        if (currentState == PlayerUI.BUTTON_OFF) {
+            mPlaybackPresenter.onButtonClicked(R.id.action_thumbs_up, currentState);
+        }
+        mHasAutoLikedCurrentVideo = true;
     }
 
     private void createMediaSession() {
@@ -835,6 +987,9 @@ public class PlaybackFragment extends SeekModePlaybackFragment implements Playba
     public void setVideo(Video video) {
         mExoPlayerController.setVideo(video);
 
+        resetWatchOverlayState();
+        hideWatchOverlay();
+
         if (mPlayerGlue != null && video != null) {
             // Preserve player formatting
             mPlayerGlue.setTitle(video.getTitleFull() != null ? video.getTitleFull() : "...");
@@ -900,11 +1055,6 @@ public class PlaybackFragment extends SeekModePlaybackFragment implements Playba
     @Override
     public void showProgressBar(boolean show) {
         if (getProgressBarManager() == null) {
-            return;
-        }
-
-        // Fix interrupted progress (by suggestions, etc). The video player can handle these states correctly.
-        if (mExoPlayerController.isLoading() || mExoPlayerController.isBuffering()) {
             return;
         }
 
