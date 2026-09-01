@@ -19,6 +19,8 @@ android {
         versionCode 10
         versionName "1.0"
 
+        // Fork-specific version tag (set per release)
+        buildConfigField "String", "FORK_VERSION", "\"v32.36-features-1\""
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         consumerProguardFiles 'consumer-rules.pro'
 
