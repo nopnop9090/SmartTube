@@ -2,11 +2,8 @@ package com.liskovsoft.smartyoutubetv2.tv.ui.browse.video;
 
 import android.content.Context;
 import android.content.res.Resources;
-import android.graphics.Rect;
-import android.os.Build.VERSION;
 import android.util.DisplayMetrics;
 import android.util.Pair;
-import android.view.WindowManager;
 
 import com.liskovsoft.sharedutils.helpers.Helpers;
 import com.liskovsoft.smartyoutubetv2.common.app.models.data.VideoGroup;
@@ -63,20 +60,10 @@ public class GridFragmentHelper {
         float uiScale = MainUIData.instance(context).getUIScale();
 
         Resources res = context.getResources();
-        int displayWidthPx;
+        DisplayMetrics displayMetrics = res.getDisplayMetrics();
 
         // Take into the account screen orientation (e.g. when running on phone)
-        if (VERSION.SDK_INT >= 30 && Helpers.isCutoutMode(context)) {
-            // Take into the account screen cutout/notch area
-            Rect bounds = context.getSystemService(WindowManager.class)
-                    .getCurrentWindowMetrics().getBounds();
-
-            displayWidthPx = Math.max(bounds.width(), bounds.height());
-        } else {
-            // Use regular display metrics
-            DisplayMetrics displayMetrics = res.getDisplayMetrics();
-            displayWidthPx = Math.max(displayMetrics.widthPixels, displayMetrics.heightPixels);
-        }
+        int displayWidthPx = Math.max(displayMetrics.widthPixels, displayMetrics.heightPixels);
 
         float cardWidthPx = res.getDimensionPixelSize(cardWidthResId) * cardScale;
         float cardSpacingPx = res.getDimensionPixelSize(R.dimen.grid_item_horizontal_spacing);
