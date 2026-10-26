@@ -233,10 +233,6 @@ public class ExoPlayerController implements Player.EventListener, LiveStateProvi
     public boolean isLoading() {
         return ExoUtils.isLoading(mPlayer);
     }
-
-    public boolean isBuffering() {
-        return ExoUtils.isBuffering(mPlayer);
-    }
     
     public boolean containsMedia() {
         if (mPlayer == null) {

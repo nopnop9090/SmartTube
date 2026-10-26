@@ -16,12 +16,11 @@ import com.liskovsoft.mediaserviceinterfaces.data.ItemGroup.Item;
 import com.liskovsoft.mediaserviceinterfaces.data.MediaItemMetadata;
 import com.liskovsoft.mediaserviceinterfaces.data.NotificationState;
 import com.liskovsoft.mediaserviceinterfaces.data.PlaylistInfo;
+import com.liskovsoft.smartyoutubetv2.common.utils.RelativePublishedTime;
 import com.liskovsoft.sharedutils.helpers.DateHelper;
 import com.liskovsoft.sharedutils.helpers.Helpers;
 import com.liskovsoft.sharedutils.helpers.MessageHelpers;
-import com.liskovsoft.sharedutils.prefs.GlobalPreferences;
 import com.liskovsoft.smartyoutubetv2.common.app.models.playback.service.VideoStateService;
-import com.liskovsoft.smartyoutubetv2.common.prefs.BlockedChannelData;
 import com.liskovsoft.smartyoutubetv2.common.prefs.PlayerTweaksData;
 import com.liskovsoft.googlecommon.common.helpers.ServiceHelper;
 import com.liskovsoft.googlecommon.common.helpers.YouTubeHelper;
@@ -307,6 +306,26 @@ public final class Video {
 
     public String getPlaylistId() {
         return isRemote && remotePlaylistId != null ? remotePlaylistId : playlistId;
+    }
+
+    /** Best-effort upload time (ms); includes parsing relative text from subtitles when API omits millis (e.g. tile rows). */
+    public long getPublishedMs() {
+        if (mediaItem == null) {
+            return 0;
+        }
+        long ms = mediaItem.getPublishedDate();
+        if (ms > 0) {
+            return ms;
+        }
+        ms = RelativePublishedTime.publishedTimeTextToUnixMs(mediaItem.getProductionDate());
+        if (ms > 0) {
+            return ms;
+        }
+        CharSequence st = mediaItem.getSecondTitle();
+        if (st == null) {
+            st = secondTitle;
+        }
+        return RelativePublishedTime.publishedTimeTextToUnixMs(Helpers.toString(st));
     }
 
     public String getCardImageUrl() {
@@ -856,17 +875,7 @@ public final class Video {
 
             if (suggestions != null && suggestions.size() > 1) {
                 List<MediaItem> mediaItems = suggestions.get(1).getMediaItems();
-                BlockedChannelData blockedChannelData = BlockedChannelData.instance(GlobalPreferences.context());
-                nextVideo = Helpers.findFirst(mediaItems,
-                        item -> {
-                            if (blockedChannelData.isEmpty()) {
-                                return item.getVideoId() != null;
-                            }
-
-                            Video video = Video.from(item);
-                            return video != null
-                                    && video.videoId != null && !blockedChannelData.containsChannel(video.channelId, video.getAuthor());
-                        });
+                nextVideo = Helpers.findFirst(mediaItems, item -> item.getVideoId() != null);
             }
         }
 
