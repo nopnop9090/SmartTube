@@ -67,7 +67,13 @@ public class AppUpdatePresenter extends BasePresenter<Void> implements AppUpdate
         } else if (GeneralData.instance(getContext()).isOldUpdateNotificationsEnabled()) {
             showUpdateDialog(versionName, changelog, apkPath);
         } else {
-            pinUpdateSection(versionName, changelog, apkPath);
+            // Deprecated path: AppUpdatePresenter.pinUpdateSection() previously installed
+            // without any warning (silent signature change). The DualAppUpdatePresenter
+            // now handles both fork and origin checks itself. Direct callers of
+            // AppUpdatePresenter.start(false) should be migrated to DualAppUpdatePresenter.
+            // As a safety net we still show the update dialog (same as old notif-enabled
+            // path) so a stray caller can't silently install the wrong APK.
+            showUpdateDialog(versionName, changelog, apkPath);
         }
     }
 
