@@ -13,6 +13,7 @@ import com.liskovsoft.smartyoutubetv2.common.app.models.playback.ui.ChatReceiver
 import com.liskovsoft.smartyoutubetv2.common.app.models.playback.ui.OptionItem;
 import com.liskovsoft.smartyoutubetv2.common.app.models.playback.ui.UiOptionItem;
 import com.liskovsoft.smartyoutubetv2.common.app.presenters.AppDialogPresenter;
+import com.liskovsoft.smartyoutubetv2.common.prefs.PlayerTweaksData;
 import com.liskovsoft.youtubeapi.service.YouTubeServiceManager;
 import io.reactivex.disposables.Disposable;
 
@@ -25,6 +26,13 @@ public class ChatController extends BasePlayerController {
      * NOTE: Don't remove duplicates! They contain different chars.
      */
     private static final String[] BLACK_LIST = {". XYZ", ". ХYZ", "⠄XYZ", "⠄ХYZ", "Ricardo Merlino", "⠄СОM", ".COM", ".СОM", ". COM"};
+    // Bot usernames that get filtered out when "Hide bot accounts" is enabled.
+    // Match is substring + case-insensitive on the author name.
+    private static final String[] BOT_NAMES = {
+            "streamlabs", "streamelements", "nightbot", "moobot",
+            "own3d", "fossabot", "streamhatchet", "streamholic",
+            "wizebot", "coebot", "streamstick", "botrix"
+    };
     private LiveChatService mChatService;
     private Disposable mChatAction;
     private String mLiveChatKey;
@@ -147,10 +155,32 @@ public class ChatController extends BasePlayerController {
         }
 
         String authorName = chatItem.getAuthorName();
+        String lowerName = authorName.toLowerCase();
 
         for (String spammer : BLACK_LIST) {
-            if (authorName.toLowerCase().contains(spammer.toLowerCase())) {
+            if (lowerName.contains(spammer.toLowerCase())) {
                 return false;
+            }
+        }
+
+        // Custom chat filters (toggleable in Player Settings).
+        PlayerTweaksData tweaks = getPlayerTweaksData();
+        if (tweaks != null) {
+            if (tweaks.isHideBotUsersEnabled()) {
+                for (String bot : BOT_NAMES) {
+                    if (lowerName.contains(bot)) {
+                        return false;
+                    }
+                }
+            }
+            if (tweaks.isHideExclamCommandsEnabled()) {
+                String msg = chatItem.getMessage();
+                if (msg != null) {
+                    String trimmed = msg.trim();
+                    if (trimmed.startsWith("!")) {
+                        return false;
+                    }
+                }
             }
         }
 
