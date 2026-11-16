@@ -3,6 +3,7 @@ package com.liskovsoft.smartyoutubetv2.common.app.presenters.dialogs;
 import android.annotation.SuppressLint;
 import android.content.Context;
 import com.liskovsoft.smartyoutubetv2.common.app.presenters.base.BasePresenter;
+import com.liskovsoft.smartyoutubetv2.common.app.presenters.updater.DualAppUpdatePresenter;
 
 /**
  * Shows boot dialogs one by one.
@@ -34,10 +35,10 @@ public class BootDialogPresenter extends BasePresenter<Void> {
     }
 
     private void startUpdatePresenter() {
-        AppUpdatePresenter updatePresenter = AppUpdatePresenter.instance(getContext());
-        //updatePresenter.setOnDone(this::startBridgePresenter);
+        // Use DualAppUpdatePresenter so the user gets a fork+origin check with proper
+        // warnings (instead of silently side-pinning an origin-only update).
+        DualAppUpdatePresenter updatePresenter = DualAppUpdatePresenter.instance(getContext());
         updatePresenter.start(false);
-        //updatePresenter.unhold();
     }
 
     //private void startBackupPresenter() {

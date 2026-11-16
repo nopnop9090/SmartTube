@@ -1,6 +1,7 @@
 package com.liskovsoft.smartyoutubetv2.common.misc;
 
 import android.content.Context;
+import android.text.TextUtils;
 import android.util.Pair;
 
 import com.liskovsoft.mediaserviceinterfaces.ContentService;
@@ -25,6 +26,7 @@ import com.liskovsoft.smartyoutubetv2.common.app.models.playback.service.VideoSt
 import com.liskovsoft.smartyoutubetv2.common.app.presenters.ChannelPresenter;
 import com.liskovsoft.smartyoutubetv2.common.app.presenters.ChannelUploadsPresenter;
 import com.liskovsoft.smartyoutubetv2.common.prefs.AccountsData;
+import com.liskovsoft.smartyoutubetv2.common.prefs.AgeCutoffData;
 import com.liskovsoft.smartyoutubetv2.common.prefs.AppPrefs;
 import com.liskovsoft.smartyoutubetv2.common.prefs.MainUIData;
 import com.liskovsoft.smartyoutubetv2.common.utils.LoadingManager;
@@ -59,7 +61,9 @@ public class MediaServiceManager implements OnAccountChange {
     private static final int MIN_ROW_GROUP_SIZE = 5;
     private static final int MIN_SCALED_GRID_GROUP_SIZE = 35;
     private static final int MIN_SCALED_ROW_GROUP_SIZE = 10;
+    private static final int MAX_AGE_CUTOFF_EXTRA_CONTINUATIONS = 20;
     private final Map<Integer, Pair<Integer, Long>> mContinuations = new HashMap<>();
+    private final Map<Integer, Integer> mAgeCutoffExtraContinuations = new HashMap<>();
     private final List<AccountChangeListener> mAccountListeners = new CopyOnWriteArrayList<>();
 
     public interface OnMetadata {
@@ -312,6 +316,12 @@ public class MediaServiceManager implements OnAccountChange {
         RxHelper.disposeActions(mMetadataAction, mUploadsAction, mRowsAction, mSubscribedChannelsAction);
     }
 
+    /** Clears row/grid continuation state (e.g. after age cutoff or similar settings change). */
+    public void clearBrowseContinuationCaches() {
+        mContinuations.clear();
+        mAgeCutoffExtraContinuations.clear();
+    }
+
     /**
      * Most tiny ui has 8 cards in a row or 24 in grid.
      */
@@ -331,15 +341,18 @@ public class MediaServiceManager implements OnAccountChange {
             return false;
         }
 
+        MediaGroup mediaGroup = group.getMediaGroup();
+
         Pair<Integer, Long> sizeTimestamp = mContinuations.get(group.getId());
 
         long currentTimeMillis = System.currentTimeMillis();
         if (sizeTimestamp != null && currentTimeMillis - sizeTimestamp.second > 3_000) { // seems that section is refreshed
             sizeTimestamp = null;
+            mAgeCutoffExtraContinuations.remove(group.getId());
         }
 
         int prevSize = sizeTimestamp != null ? sizeTimestamp.first : 0;
-        int newSize = Math.max(group.getSize(), 0);
+        int newSize = mediaGroup.getMediaItems() != null ? mediaGroup.getMediaItems().size() : 0;
         int totalSize = prevSize + newSize;
 
         MainUIData mainUIData = MainUIData.instance(context);
@@ -351,7 +364,28 @@ public class MediaServiceManager implements OnAccountChange {
 
         mContinuations.put(group.getId(), new Pair<>(groupTooSmall ? totalSize : 0, currentTimeMillis));
 
-        return groupTooSmall;
+        boolean result = groupTooSmall;
+
+        if (!result) {
+            AgeCutoffData ageCutoffData = AgeCutoffData.instance(context);
+            if (ageCutoffData.shouldConsiderVisibleCountForContinuation(group)) {
+                String nextKey = mediaGroup.getNextPageKey();
+                if (!TextUtils.isEmpty(nextKey)) {
+                    int visible = group.getVideos() != null ? group.getVideos().size() : 0;
+                    int minVisible = isScaledUIEnabled ? minScaledSize : minSize;
+                    boolean visibleTooSmall = visible < minVisible;
+                    if (visibleTooSmall) {
+                        int ageCount = mAgeCutoffExtraContinuations.getOrDefault(group.getId(), 0);
+                        if (ageCount < MAX_AGE_CUTOFF_EXTRA_CONTINUATIONS) {
+                            result = true;
+                            mAgeCutoffExtraContinuations.put(group.getId(), ageCount + 1);
+                        }
+                    }
+                }
+            }
+        }
+
+        return result;
     }
 
     public void enableHistory(boolean enable) {
