@@ -25,6 +25,7 @@ import java.util.List;
 public abstract class MaxControlsVideoPlayerGlue<T extends PlayerAdapter>
         extends PlaybackTransportControlGlue<T> implements TopEdgeFocusListener, PlayerView {
     private String mQualityInfo;
+    private boolean mAgeRestriction;
     private Video mVideo;
     private LiveStateProvider mLiveStateProvider;
     private WeakReference<PlaybackTransportRowPresenter.ViewHolder> mTransportViewHolder;
@@ -128,6 +129,15 @@ public abstract class MaxControlsVideoPlayerGlue<T extends PlayerAdapter>
 
         if (getTransportViewHolder() != null) {
             getTransportViewHolder().setQualityInfo(info);
+        }
+    }
+
+    @Override
+    public void setAgeRestriction(boolean isRestricted) {
+        mAgeRestriction = isRestricted;
+
+        if (getTransportViewHolder() != null) {
+            getTransportViewHolder().setAgeRestriction(isRestricted);
         }
     }
 

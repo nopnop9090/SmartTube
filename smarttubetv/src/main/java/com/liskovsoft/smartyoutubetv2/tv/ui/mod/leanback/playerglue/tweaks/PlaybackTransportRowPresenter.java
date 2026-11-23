@@ -92,6 +92,7 @@ public class PlaybackTransportRowPresenter extends PlaybackRowPresenter {
         final TextView mCurrentTime;
         final TextView mEndingTime;
         final TextView mQualityInfo;
+        final TextView mAgeRestrictionBadge;
         final TextView mDateTime;
         final ViewGroup mAdditionalInfo;
         final ViewGroup mTimeInfo;
@@ -436,6 +437,7 @@ public class PlaybackTransportRowPresenter extends PlaybackRowPresenter {
             mCurrentTime = (TextView) rootView.findViewById(R.id.current_time);
             mTotalTime = (TextView) rootView.findViewById(R.id.total_time);
             mQualityInfo = (TextView) rootView.findViewById(com.liskovsoft.smartyoutubetv2.tv.R.id.quality_info);
+            mAgeRestrictionBadge = (TextView) rootView.findViewById(com.liskovsoft.smartyoutubetv2.tv.R.id.age_restriction_badge);
             mDateTime = (TextView) rootView.findViewById(com.liskovsoft.smartyoutubetv2.tv.R.id.date_time);
             mEndingTime = (TextView) rootView.findViewById(com.liskovsoft.smartyoutubetv2.tv.R.id.ending_time);
             mEndingTimeFormat = rootView.getContext().getString(com.liskovsoft.smartyoutubetv2.tv.R.string.player_ending_time);
@@ -790,6 +792,12 @@ public class PlaybackTransportRowPresenter extends PlaybackRowPresenter {
                     mQualityInfo.setVisibility(View.GONE);
                 }
             }
+        }
+
+        void setAgeRestriction(boolean isRestricted) {
+            // FORK ADDITION: hardcoded, no setting switch (minimal-invasive pattern).
+            // Always shown when restricted - user can clearly see this is a sensitive video.
+            mAgeRestrictionBadge.setVisibility(isRestricted ? View.VISIBLE : View.GONE);
         }
 
         void setDateVisibility(boolean isVisible) {

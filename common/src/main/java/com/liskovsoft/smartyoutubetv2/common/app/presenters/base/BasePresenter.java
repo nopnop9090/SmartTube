@@ -222,14 +222,14 @@ public abstract class BasePresenter<T> implements Presenter<T> {
                 return;
             }
 
+            manager.setBlocked(false);
+            manager.disable();
+
             if (getPlayerTweaksData().isBootScreenOffEnabled()
                     && getPlayerTweaksData().getScreenOffTimeoutSec() == 0
                     && getPlayerTweaksData().getScreenOffDimmingPercents() < 100) {
-                manager.setBlocked(true);
                 manager.doScreenOff();
-            } else {
-                manager.setBlocked(false);
-                manager.enable();
+                manager.setBlocked(true);
             }
         }
     }
